@@ -1,6 +1,6 @@
 {
   "name": "robin-town",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "description": "Chinatown negotiation board game adaptation for Robinhood Chain with $wif tokenomics flywheel and original pixel art assets.",
@@ -8,6 +8,8 @@
     "start": "node scripts/serve-prod.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "npm run typecheck && npm run verify:assets && vite build",
+    "contract:compile": "node scripts/compile-contract.mjs",
+    "contract:test": "forge test -vvv",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/**/*.test.ts",
     "test:unit": "node --import tsx --test tests/unit/**/*.test.ts",

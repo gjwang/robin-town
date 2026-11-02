@@ -120,12 +120,16 @@ const server = http.createServer((req, res) => {
   }
 
   if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
-    if (safeRel === 'index.html' && (req.url || '').includes('?')) {
+    const vaultInfo = relay.walletRegistry.getVaultContractInfo();
+    if (
+      safeRel === 'index.html' &&
+      ((req.url || '').includes('?') || Boolean(vaultInfo.vaultContractAddress))
+    ) {
       const baseHtml = fs.readFileSync(resolved, 'utf8');
       const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
       const host = String(req.headers.host || '').trim();
       const origin = host ? `${proto}://${host}` : PRODUCTION_ORIGIN;
-      const html = renderDynamicIndexHtml(baseHtml, req.url || '/', origin);
+      const html = renderDynamicIndexHtml(baseHtml, req.url || '/', origin, vaultInfo);
       res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-cache',
@@ -148,12 +152,13 @@ const server = http.createServer((req, res) => {
 
   const indexHtml = path.join(DIST_DIR, 'index.html');
   if (fs.existsSync(indexHtml)) {
-    if ((req.url || '').includes('?')) {
+    const vaultInfo = relay.walletRegistry.getVaultContractInfo();
+    if ((req.url || '').includes('?') || Boolean(vaultInfo.vaultContractAddress)) {
       const baseHtml = fs.readFileSync(indexHtml, 'utf8');
       const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
       const host = String(req.headers.host || '').trim();
       const origin = host ? `${proto}://${host}` : PRODUCTION_ORIGIN;
-      const html = renderDynamicIndexHtml(baseHtml, req.url || '/', origin);
+      const html = renderDynamicIndexHtml(baseHtml, req.url || '/', origin, vaultInfo);
       res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-cache',

@@ -150,7 +150,7 @@ export function createMultiplayerRelay(options = {}) {
   }
 
   function handleApiRequest(req, res) {
-    if (handleShipUpdatesRequest(req, res)) {
+    if (handleShipUpdatesRequest(req, res, walletRegistry.getVaultContractInfo())) {
       return true;
     }
     const rawUrl = (req.url || '/').split('?')[0] || '/';
@@ -191,6 +191,7 @@ export function createMultiplayerRelay(options = {}) {
     }
 
     if (rawUrl === '/api/onchain-wif' && req.method === 'GET') {
+      const vaultInfo = walletRegistry.getVaultContractInfo();
       getLiveOnChainWifProof()
         .then((proof) => {
           res.writeHead(200, {
@@ -198,7 +199,13 @@ export function createMultiplayerRelay(options = {}) {
             'Cache-Control': 'public, max-age=10',
             'Access-Control-Allow-Origin': '*',
           });
-          res.end(JSON.stringify(proof));
+          res.end(
+            JSON.stringify({
+              ...proof,
+              vaultContractAddress: vaultInfo.vaultContractAddress,
+              vaultExplorerUrl: vaultInfo.explorerUrl,
+            }),
+          );
         })
         .catch((err) => {
           res.writeHead(200, {

@@ -9,33 +9,58 @@ interface IERC20 {
 
 /**
  * @title RobinTownHarborVault
- * @notice On-chain World is Flat ($wif) Staking Vault, District Patronage, and Ranked Harbor Arena
- *         for Robin Town on Robinhood Chain Mainnet (Chain ID 4663).
- * @dev Official World is Flat ($wif) token: 0x5173b8eA6923c2d40267890D45C46a3480954773.
- *      Traders can stake $wif with instant withdrawal to unlock the 1.20x annual storefront payday
- *      multiplier, or patronize harbor districts and enter ranked matches where 50% of $wif is
- *      permanently burned to 0x000000000000000000000000000000000000dEaD and 50% funds the vault pool.
+ * @notice Official Robin Town on-chain game contract on Robinhood Chain Mainnet (Chain ID 4663).
+ *         Unifies World is Flat ($wif) instant-withdrawal staking, deflationary district patronage,
+ *         ranked harbor arena escrow, Year 6 Daily Seed score anchoring, and soulbound Harbor
+ *         Reputation (RTOWN) while keeping $wif (0x5173b8eA6923c2d40267890D45C46a3480954773) as
+ *         the sole transferable game token.
  */
 contract RobinTownHarborVault {
+    string public constant name = "Robin Town";
+    string public constant symbol = "RTOWN";
+    uint8 public constant decimals = 18;
+
+    string public constant PROJECT_WEBSITE = "https://robin-town-production.up.railway.app";
+    string public constant PROJECT_GITHUB = "https://github.com/harrymove-ctrl/robin-town";
+    string public constant PROJECT_UPDATES = "https://robin-town-production.up.railway.app/updates";
+
     address public constant OFFICIAL_WIF_MAINNET = 0x5173b8eA6923c2d40267890D45C46a3480954773;
     address public constant BURN_SINK = 0x000000000000000000000000000000000000dEaD;
     uint256 public constant MIN_BOOST_STAKE = 10 ether;
+    uint32 public constant MAX_PLAUSIBLE_NET_WORTH_WIF = 250_000;
+    uint32 public constant MAX_REP_MINT_PER_MATCH = 2_500;
     uint8 public constant DISTRICT_COUNT = 6;
+    bytes32 private constant CATEGORY_DISTRICT_PATRON = "DISTRICT_PATRON";
 
     IERC20 public immutable wif;
     address public owner;
 
     uint256 private unlocked = 1;
 
+    // Soulbound Harbor Reputation (RTOWN) state
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+
+    // $wif Vault & Deflationary Burn state
     uint256 public totalStaked;
     uint256 public totalBurnedViaVault;
     uint256 public totalHarborPool;
 
+    // Game Match & Leaderboard Registry state
+    uint64 public totalOnChainMatches;
+    uint64 public totalUniquePlayers;
+
+    mapping(address => bool) public hasRegisteredPlayer;
     mapping(address => uint256) public stakedBalanceOf;
     mapping(address => uint256) public lifetimeBurnedBy;
+    mapping(address => uint32) public matchesPlayedBy;
+    mapping(address => uint32) public bestNetWorthOf;
+    mapping(address => uint32) public lastCasualRepDay;
+    mapping(address => mapping(uint32 => uint32)) public dailySeedScoreOf;
     mapping(uint8 => uint256) public districtPatronageTotal;
     mapping(bytes32 => mapping(address => uint256)) public matchEntries;
 
+    event Transfer(address indexed from, address indexed to, uint256 value);
     event HarborStaked(address indexed trader, uint256 amount, uint256 newStakedBalance);
     event HarborUnstaked(address indexed trader, uint256 amount, uint256 remainingStakedBalance);
     event HarborBurn(address indexed trader, uint256 burnedAmount, bytes32 indexed category);
@@ -53,14 +78,24 @@ contract RobinTownHarborVault {
         uint256 burnedAmount,
         uint256 poolAdded
     );
+    event HarborMatchAnchored(
+        address indexed player,
+        uint32 indexed dailySeedYmd,
+        uint32 finalNetWorthWif,
+        uint8 districtsWon,
+        uint64 matchNumber
+    );
     event HarborRewardDistributed(address indexed recipient, uint256 amount, bytes32 indexed reason);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     error ReentrancyBlocked();
     error InvalidAmount();
     error InvalidDistrict();
+    error InvalidDailySeed();
+    error DailySeedAlreadyAnchored();
     error InsufficientStake();
     error InsufficientPoolBalance();
+    error SoulboundReputation();
     error Unauthorized();
     error TransferFailed();
 
@@ -83,19 +118,119 @@ contract RobinTownHarborVault {
     }
 
     /**
+     * @notice Soulbound Harbor Reputation (RTOWN) cannot be transferred or traded; $wif is the sole money token.
+     */
+    function allowance(address, address) external pure returns (uint256) {
+        return 0;
+    }
+
+    function approve(address, uint256) external pure returns (bool) {
+        revert SoulboundReputation();
+    }
+
+    function transfer(address, uint256) external pure returns (bool) {
+        revert SoulboundReputation();
+    }
+
+    function transferFrom(address, address, uint256) external pure returns (bool) {
+        revert SoulboundReputation();
+    }
+
+    /**
      * @notice Returns true if trader qualifies for the 1.20x annual storefront payday multiplier.
      */
-    function hasPaydayBoost(address trader) external view returns (bool) {
+    function hasPaydayBoost(address trader) public view returns (bool) {
         return stakedBalanceOf[trader] >= MIN_BOOST_STAKE || lifetimeBurnedBy[trader] >= 1 ether;
     }
 
     /**
+     * @notice Returns a consolidated snapshot of a player's on-chain Harbor Vault & Match profile.
+     */
+    function getPlayerSummary(
+        address trader
+    )
+        external
+        view
+        returns (
+            uint256 stakedWif,
+            uint256 burnedWif,
+            uint256 reputation,
+            uint32 bestNetWorth,
+            uint32 matchesPlayed,
+            bool boostActive
+        )
+    {
+        return (
+            stakedBalanceOf[trader],
+            lifetimeBurnedBy[trader],
+            balanceOf[trader],
+            bestNetWorthOf[trader],
+            matchesPlayedBy[trader],
+            hasPaydayBoost(trader)
+        );
+    }
+
+    /**
+     * @notice Anchors a completed 6-year Robin Town match score on Robinhood Chain (gas-only, zero $wif required).
+     *         Pass dailySeedYmd as YYYYMMDD (for example 20261102) for Daily Harbor Challenges, or 0 for Casual Town.
+     */
+    function recordHarborMatch(
+        uint32 dailySeedYmd,
+        uint32 finalNetWorthWif,
+        uint8 districtsWon
+    ) external nonReentrant {
+        if (finalNetWorthWif == 0 || finalNetWorthWif > MAX_PLAUSIBLE_NET_WORTH_WIF) {
+            revert InvalidAmount();
+        }
+        if (districtsWon > DISTRICT_COUNT) revert InvalidDistrict();
+
+        bool mintRep = false;
+        if (dailySeedYmd != 0) {
+            if (dailySeedYmd < 20260101 || dailySeedYmd > 21001231) revert InvalidDailySeed();
+            if (dailySeedScoreOf[msg.sender][dailySeedYmd] != 0) revert DailySeedAlreadyAnchored();
+            dailySeedScoreOf[msg.sender][dailySeedYmd] = finalNetWorthWif;
+            mintRep = true;
+        } else {
+            uint32 utcDay = uint32(block.timestamp / 1 days);
+            if (lastCasualRepDay[msg.sender] < utcDay) {
+                lastCasualRepDay[msg.sender] = utcDay;
+                mintRep = true;
+            }
+        }
+
+        _touchPlayer(msg.sender);
+        unchecked {
+            matchesPlayedBy[msg.sender] += 1;
+            totalOnChainMatches += 1;
+        }
+        if (finalNetWorthWif > bestNetWorthOf[msg.sender]) {
+            bestNetWorthOf[msg.sender] = finalNetWorthWif;
+        }
+
+        if (mintRep) {
+            uint32 cappedScore = finalNetWorthWif > MAX_REP_MINT_PER_MATCH
+                ? MAX_REP_MINT_PER_MATCH
+                : finalNetWorthWif;
+            _mintReputation(msg.sender, uint256(cappedScore) * 1 ether);
+        }
+
+        emit HarborMatchAnchored(
+            msg.sender,
+            dailySeedYmd,
+            finalNetWorthWif,
+            districtsWon,
+            totalOnChainMatches
+        );
+    }
+
+    /**
      * @notice Stakes $wif in the Harbor Vault to activate the 1.20x storefront payday boost.
-     *         Funds remain 100% withdrawable at any time via unstakeWif.
+     *         Principal funds remain 100% withdrawable at any time via unstakeWif.
      */
     function stakeWif(uint256 amount) external nonReentrant {
         if (amount == 0) revert InvalidAmount();
         _pullWif(msg.sender, address(this), amount);
+        _touchPlayer(msg.sender);
         stakedBalanceOf[msg.sender] += amount;
         totalStaked += amount;
         emit HarborStaked(msg.sender, amount, stakedBalanceOf[msg.sender]);
@@ -129,13 +264,15 @@ contract RobinTownHarborVault {
 
         _pullWif(msg.sender, BURN_SINK, burnShare);
         _pullWif(msg.sender, address(this), poolShare);
+        _touchPlayer(msg.sender);
 
         totalBurnedViaVault += burnShare;
         totalHarborPool += poolShare;
         lifetimeBurnedBy[msg.sender] += burnShare;
         districtPatronageTotal[districtId] += amount;
+        _mintReputation(msg.sender, burnShare * 10);
 
-        emit HarborBurn(msg.sender, burnShare, bytes32("DISTRICT_PATRON"));
+        emit HarborBurn(msg.sender, burnShare, CATEGORY_DISTRICT_PATRON);
         emit DistrictPatronized(msg.sender, districtId, amount, burnShare, poolShare);
     }
 
@@ -151,11 +288,13 @@ contract RobinTownHarborVault {
 
         _pullWif(msg.sender, BURN_SINK, burnShare);
         _pullWif(msg.sender, address(this), poolShare);
+        _touchPlayer(msg.sender);
 
         totalBurnedViaVault += burnShare;
         totalHarborPool += poolShare;
         lifetimeBurnedBy[msg.sender] += burnShare;
         matchEntries[matchId][msg.sender] += amount;
+        _mintReputation(msg.sender, burnShare * 10);
 
         emit HarborBurn(msg.sender, burnShare, matchId);
         emit RankedHarborEntered(msg.sender, matchId, amount, burnShare, poolShare);
@@ -182,6 +321,22 @@ contract RobinTownHarborVault {
         if (newOwner == address(0)) revert InvalidAmount();
         emit OwnershipTransferred(owner, newOwner);
         owner = newOwner;
+    }
+
+    function _touchPlayer(address player) private {
+        if (!hasRegisteredPlayer[player]) {
+            hasRegisteredPlayer[player] = true;
+            unchecked {
+                totalUniquePlayers += 1;
+            }
+        }
+    }
+
+    function _mintReputation(address player, uint256 repAmount) private {
+        if (repAmount == 0) return;
+        balanceOf[player] += repAmount;
+        totalSupply += repAmount;
+        emit Transfer(address(0), player, repAmount);
     }
 
     function _pullWif(address from, address to, uint256 amount) private {

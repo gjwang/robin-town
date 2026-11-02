@@ -700,6 +700,16 @@ export function mountRobinTown(): void {
     }
   }
 
+  function resolveActiveHarborVaultAddress(): string {
+    const candidate = (
+      walletStats?.vaultContractAddress ||
+      onChainProof?.vaultContractAddress ||
+      HARBOR_VAULT_CONTRACT_ADDRESS ||
+      ''
+    ).trim();
+    return /^0x[0-9a-fA-F]{40}$/.test(candidate) ? candidate : '';
+  }
+
   function markTutorialComplete(): void {
     if (tutorialDone) return;
     tutorialDone = true;
@@ -2173,7 +2183,8 @@ export function mountRobinTown(): void {
     const eip6963Wallets = discoverEip6963Wallets();
     const selectedRdns = wallet.getSelectedProviderRdns();
     const hasProvider = hasInjectedWeb3Provider();
-    const vaultReady = Boolean(HARBOR_VAULT_CONTRACT_ADDRESS);
+    const vaultAddr = resolveActiveHarborVaultAddress();
+    const vaultReady = Boolean(vaultAddr);
 
     modal(
       '$wif Flywheel, Wallet & Online Rooms',
@@ -2246,15 +2257,17 @@ export function mountRobinTown(): void {
       </section>
 
       <section class="wif-hub-section">
-        <h3>2. $wif Staking & On-Chain Patron Yield Boost (1.20x Shop Paydays)</h3>
-        <p>Lock 500 $wif in the neighborhood Staking Vault (or verify >= 1 $wif moved on Robinhood Chain 4663) to multiply all your annual storefront paydays by <strong>1.20x</strong>.</p>
+        <h3>2. $wif Staking, Harbor Vault &amp; On-Chain Match Anchor (Chain 4663)</h3>
+        <p>Lock 500 $wif in local Staking Vault (or stake &gt;= 10 $wif in <strong>RobinTownHarborVault</strong> on Chain 4663) for <strong>1.20x</strong> shop paydays, and anchor your Year 6 scores on chain to mint soulbound <code>RTOWN</code> Harbor Reputation.</p>
         <div class="wif-row-actions">
           <button type="button" class="primary" data-action="toggle-stake">${stakedWif >= 500 ? 'Unstake 500 $wif (Active 1.20x)' : 'Stake 500 $wif -> Activate 1.20x Boost'}</button>
           ${
-            vaultReady && currentRealWeb3Address()
-              ? `<button type="button" class="secondary" data-action="stake-mainnet-vault">⛓️ Vault Stake 500 $wif</button>
-                 <button type="button" class="secondary" data-action="unstake-mainnet-vault">⛓️ Vault Unstake</button>`
-              : ''
+            vaultReady
+              ? `<button type="button" class="secondary" data-action="stake-mainnet-vault">⛓️ Vault Stake 10 $wif</button>
+                 <button type="button" class="secondary" data-action="unstake-mainnet-vault">⛓️ Vault Unstake 10 $wif</button>
+                 <button type="button" class="secondary" data-action="anchor-match-onchain">⛓️ Anchor Score On-Chain</button>
+                 <a class="robin-chain-pill" href="${ROBINHOOD_MAINNET_EXPLORER_URL}/address/${escape(vaultAddr)}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">🏛️ Vault: ${escape(vaultAddr.slice(0, 8))}…${escape(vaultAddr.slice(-4))} ↗</a>`
+              : `<a class="secondary" href="/deploy" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">🛠️ Deploy Game Contract Studio (/deploy) ↗</a>`
           }
           <span class="muted" style="font-size:12px">${patronActive ? '⛓️ 1.20x On-Chain Patron Boost permanently active!' : isStaked() ? 'Staked: 500 $wif earning boosted street yield' : 'Currently unstaked (1.00x base yield)'}</span>
         </div>
@@ -2947,6 +2960,11 @@ export function mountRobinTown(): void {
                   <div class="wif-row-actions" style="justify-content:center;margin-top:8px">
                     <button type="button" class="primary" data-action="download-score-card">📸 Download PNG</button>
                     <button type="button" class="secondary" data-action="share-score-x">𝕏 Share on X</button>
+                    ${
+                      resolveActiveHarborVaultAddress()
+                        ? `<button type="button" class="secondary" data-action="anchor-match-onchain">⛓️ Anchor Score On-Chain</button>`
+                        : ''
+                    }
                   </div>
                 </div>`
               : ''
@@ -3234,13 +3252,26 @@ export function mountRobinTown(): void {
         break;
       }
       case 'stake-mainnet-vault': {
+        const vaultAddr = resolveActiveHarborVaultAddress();
         void wallet
-          .stakeMainnetVaultWif(500)
+          .stakeMainnetVaultWif(10, vaultAddr)
           .then((tx) => {
             lastMainnetTxHash = tx.hash;
             stakedWif = Math.max(500, stakedWif);
             saveEconomy();
-            toast('⛓️ Staked 500 $wif in RobinTownHarborVault! 1.20x Payday Boost active.');
+            toast('⛓️ Staked 10 $wif in RobinTownHarborVault! 1.20x Payday Boost active.');
+            void waitAndVerifyOnChainTx({
+              address: currentRealWeb3Address(),
+              txHash: tx.hash,
+            }).then((verified) => {
+              if (verified) {
+                walletStats = verified;
+                if (verified.bonusTownPoints > 0) townPoints += verified.bonusTownPoints;
+                saveEconomy();
+              } else {
+                refreshWalletStats();
+              }
+            });
             if (get('#modal').dataset.wifHub === 'true') openWifHub();
             render();
           })
@@ -3250,18 +3281,67 @@ export function mountRobinTown(): void {
         break;
       }
       case 'unstake-mainnet-vault': {
+        const vaultAddr = resolveActiveHarborVaultAddress();
         void wallet
-          .unstakeMainnetVaultWif(500)
+          .unstakeMainnetVaultWif(10, vaultAddr)
           .then((tx) => {
             lastMainnetTxHash = tx.hash;
             stakedWif = 0;
             saveEconomy();
-            toast('⛓️ Unstaked 500 $wif from RobinTownHarborVault.');
+            toast('⛓️ Unstaked 10 $wif from RobinTownHarborVault.');
             if (get('#modal').dataset.wifHub === 'true') openWifHub();
             render();
           })
           .catch((err: unknown) => {
             toast(err instanceof Error ? err.message : 'Vault unstake transaction cancelled.');
+          });
+        break;
+      }
+      case 'anchor-match-onchain': {
+        const vaultAddr = resolveActiveHarborVaultAddress();
+        const seedDigits =
+          state.entryMode === 'daily' && state.dailySeed
+            ? Number(state.dailySeed.replace(/-/g, ''))
+            : 0;
+        const bestWorth = Math.max(
+          1,
+          Math.round(state.players[0]?.cash || walletStats?.me?.bestNetWorthWif || 150),
+        );
+        const districtsWon = getPlayerDistrictMajorities(state, 0).length;
+        void wallet
+          .anchorMatchOnChain(
+            Number.isFinite(seedDigits) ? seedDigits : 0,
+            bestWorth,
+            districtsWon,
+            vaultAddr,
+          )
+          .then((tx) => {
+            lastMainnetTxHash = tx.hash;
+            saveEconomy();
+            toast(
+              `⛓️ Anchored ${bestWorth.toLocaleString('en-US')} $wif on Robinhood Chain (4663) & minted RTOWN Reputation!`,
+            );
+            void waitAndVerifyOnChainTx({
+              address: currentRealWeb3Address(),
+              txHash: tx.hash,
+            })
+              .then((verified) => {
+                if (verified) {
+                  walletStats = verified;
+                  if (verified.bonusTownPoints > 0) townPoints += verified.bonusTownPoints;
+                  saveEconomy();
+                } else {
+                  refreshWalletStats();
+                }
+                if (get('#modal').dataset.wifHub === 'true') openWifHub();
+                render();
+              })
+              .catch(() => {
+                refreshWalletStats();
+              });
+          })
+          .catch((err: unknown) => {
+            toast(err instanceof Error ? err.message : 'On-chain match anchor cancelled.');
           });
         break;
       }

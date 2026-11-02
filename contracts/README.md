@@ -1,32 +1,31 @@
-# Robin Town Harbor Vault Smart Contract (Robinhood Chain Mainnet 4663)
+# Robin Town Harbor Vault & Game Smart Contract (Robinhood Chain Mainnet 4663)
 
-`RobinTownHarborVault.sol` is the companion Solidity `^0.8.24` contract for **Robin Town** on **Robinhood Chain Mainnet (`Chain ID 4663`)**, built around the official **World is Flat (`$wif`)** ERC-20 token (`0x5173b8eA6923c2d40267890D45C46a3480954773`, `18` decimals).
+`RobinTownHarborVault.sol` is the official Solidity `^0.8.24` (`EVM paris`, optimizer `200` runs) game smart contract for **Robin Town** on **Robinhood Chain Mainnet (`Chain ID 4663`)**, built around the official **World is Flat (`$wif`)** ERC-20 token (`0x5173b8eA6923c2d40267890D45C46a3480954773`, `18` decimals).
 
-## Core Mechanics
+## Core On-Chain Game Mechanics
 
-1. **Instant Withdrawal `$wif` Staking (`stakeWif` / `unstakeWif`)**:
-   * Traders lock `$wif` (`>= 10 $wif` accessible Mainnet threshold) to activate the **1.20x annual storefront payday multiplier** inside Robin Town.
-   * Principal staked balances are strictly segregated from prize pool funds (`totalStaked` vs `totalHarborPool`) so traders can withdraw `100%` of their staked `$wif` at any time.
-2. **District Patronage & Ranked Harbor Arena (`patronizeDistrict` / `enterRankedHarbor`)**:
-   * Splits every `$wif` deposit atomically on-chain: **50%** is transferred directly to the permanent burn sink (`0x000000000000000000000000000000000000dEaD`) and **50%** enters `totalHarborPool` for leaderboard rewards.
-   * Emits indexed `HarborBurn`, `DistrictPatronized`, and `RankedHarborEntered` events alongside standard ERC-20 `Transfer` logs.
-3. **Zero-Config RPC Receipt Verification (`/api/wallets/tx`)**:
-   * Both direct `$wif` ERC-20 transfers/burns (`transfer` to `0x...dEaD`) and `RobinTownHarborVault` calls emit standard ERC-20 `Transfer` logs on `0x5173b8eA6923c2d40267890D45C46a3480954773`.
-   * The Robin Town server (`scripts/wallet-registry.mjs`) queries `eth_getTransactionReceipt` on `https://rpc.mainnet.chain.robinhood.com`, verifies `status === "0x1"`, decodes `Transfer(from, to, value)`, blocks replay across tx hashes, awards `+150 Town Points`, and unlocks the `1.20x` On-Chain Patron Boost on the Harbor Leaderboard.
+1. **Gas-Only Year 6 Match & Daily Seed Anchoring (`recordHarborMatch`)**:
+   1. Any player connected with MetaMask or Rabby on Robinhood Chain (`4663`) can permanently anchor their 6-year Harbor Empire score (`finalNetWorthWif`, `districtsWon`, and `dailySeedYmd`) on chain with zero `$wif` spend required.
+   2. Enforces one Daily Seed anchor per `(player, dailySeedYmd)` (`DailySeedAlreadyAnchored`), tracks `totalOnChainMatches` and `totalUniquePlayers`, and mints non-transferable soulbound **Harbor Reputation (`RTOWN`)** (`name() = "Robin Town"`, `symbol() = "RTOWN"`).
+2. **Instant-Withdrawal `$wif` Staking (`stakeWif` / `unstakeWif`)**:
+   1. Traders lock `$wif` (`>= 10 $wif` accessible Mainnet threshold) to activate the **1.20x annual storefront payday multiplier** inside Robin Town.
+   2. Principal staked balances (`totalStaked`) are strictly segregated from prize pool funds (`totalHarborPool`) so traders can withdraw `100%` of their staked `$wif` at any time.
+3. **Deflationary District Patronage & Ranked Harbor Arena (`patronizeDistrict` / `enterRankedHarbor`)**:
+   1. Splits every `$wif` deposit atomically on chain: **50%** is transferred directly to the permanent burn sink (`0x000000000000000000000000000000000000dEaD`) and **50%** enters `totalHarborPool` for leaderboard rewards, while minting `10x` bonus `RTOWN` Harbor Reputation.
 
-## Deploy & Verify on Robinhood Chain Blockscout
+## Option A: 1-Click Browser MetaMask Deploy Studio (Recommended, Zero Private Key Exposure)
 
-Using Foundry (`forge`):
+1. Open `https://robin-town-production.up.railway.app/deploy` in Chrome or Brave with MetaMask or Rabby.
+2. Click **1. Connect MetaMask / Rabby (Chain 4663)**, then **2. Deploy RobinTownHarborVault Now** (`~1.32M` gas on Chain `4663`).
+3. Click **3. Sign & Activate Live on Robin Town**: the server cryptographically verifies `eth_getCode` byte-for-byte against the compiled `RobinTownHarborVault` artifact and binds the Blockscout contract URL live across `/`, `/updates`, `/updates.json`, `$wif` Hub, and the Year 6 Victory Score Card.
+
+## Option B: CLI Deploy via Foundry (`forge`)
 
 ```bash
+forge test -vvv
 forge create contracts/RobinTownHarborVault.sol:RobinTownHarborVault \
   --rpc-url https://rpc.mainnet.chain.robinhood.com \
   --chain-id 4663 \
   --private-key "$DEPLOYER_PRIVATE_KEY" \
-  --constructor-args 0x5173b8eA6923c2d40267890D45C46a3480954773 \
-  --verify \
-  --verifier blockscout \
-  --verifier-url https://robinhoodchain.blockscout.com/api/
+  --constructor-args 0x5173b8eA6923c2d40267890D45C46a3480954773
 ```
-
-Once deployed, set `VITE_HARBOR_VAULT_ADDRESS=0xYourDeployedVaultAddress` in Railway variables if you want the `$wif` Hub Patron button to route into the custom vault address in addition to direct `0x...dEaD` `$wif` burns.

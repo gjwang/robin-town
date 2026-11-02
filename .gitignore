@@ -13,3 +13,5 @@ video/public/audio/*.wav
 docs/video/exports/*.mp4
 .data/
 skills/
+contracts/out/
+contracts/cache/

@@ -15,6 +15,7 @@ COPY --from=builder /app/scripts/serve-prod.mjs ./scripts/serve-prod.mjs
 COPY --from=builder /app/scripts/ws-relay.mjs ./scripts/ws-relay.mjs
 COPY --from=builder /app/scripts/wallet-registry.mjs ./scripts/wallet-registry.mjs
 COPY --from=builder /app/scripts/ship-updates.mjs ./scripts/ship-updates.mjs
+COPY --from=builder /app/scripts/contract-artifact.mjs ./scripts/contract-artifact.mjs
 RUN mkdir -p /data
 EXPOSE 8080
 CMD ["node", "scripts/serve-prod.mjs"]

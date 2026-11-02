@@ -52,6 +52,8 @@ export interface OnChainWifProof {
   burnedDeadBalanceWif: number;
   explorerUrl: string;
   burnAddressUrl: string;
+  vaultContractAddress?: string | null;
+  vaultExplorerUrl?: string | null;
   fetchedAt: string;
 }
 
@@ -127,6 +129,7 @@ export interface HarborWalletRegistrySummary {
   ok: boolean;
   storePersistent: boolean;
   todaySeed?: string;
+  vaultContractAddress?: string | null;
   totalUniqueWallets: number;
   verifiedWallets: number;
   totalMatchesPlayed: number;
@@ -566,6 +569,30 @@ export function encodeVaultHasPaydayBoostCalldata(trader: string): string {
  */
 export function encodeVaultStakedBalanceOfCalldata(trader: string): string {
   return `0x16765391${pad32HexAddress(trader)}`;
+}
+
+/**
+ * Encodes `RobinTownHarborVault.recordHarborMatch(uint32,uint32,uint8)` selector `0xfa9e6186`.
+ */
+export function encodeVaultRecordMatchCalldata(
+  dailySeedYmd: number,
+  finalNetWorthWif: number,
+  districtsWon: number,
+): string {
+  const safeSeed = Math.max(0, Math.floor(dailySeedYmd));
+  const safeWorth = Math.max(1, Math.min(250_000, Math.round(finalNetWorthWif)));
+  const safeDistricts = Math.max(0, Math.min(6, Math.floor(districtsWon)));
+  const seedHex = safeSeed.toString(16).padStart(64, '0');
+  const worthHex = safeWorth.toString(16).padStart(64, '0');
+  const distHex = safeDistricts.toString(16).padStart(64, '0');
+  return `0xfa9e6186${seedHex}${worthHex}${distHex}`;
+}
+
+/**
+ * Encodes `RobinTownHarborVault.getPlayerSummary(address)` selector `0xdc96d5fc`.
+ */
+export function encodeVaultGetPlayerSummaryCalldata(trader: string): string {
+  return `0xdc96d5fc${pad32HexAddress(trader)}`;
 }
 
 /**
@@ -1689,6 +1716,44 @@ export class WalletAdapter {
     this.transactions.push(tx);
     const nextBal = await this.getErc20Balance(this.web3Account.address, WIF_TOKEN_CONTRACT_ADDRESS);
     this.web3Account.balance = Number(nextBal.toFixed(4));
+    this.emitState();
+    return tx;
+  }
+
+  /**
+   * Anchors a completed 6-year match score on Robinhood Chain Mainnet (`4663`) via
+   * `RobinTownHarborVault.recordHarborMatch(uint32,uint32,uint8)` (gas-only, zero `$wif` spent).
+   */
+  public async anchorMatchOnChain(
+    dailySeedYmd: number,
+    finalNetWorthWif: number,
+    districtsWon: number,
+    vaultAddress: string = HARBOR_VAULT_CONTRACT_ADDRESS,
+  ): Promise<WalletTransaction> {
+    if (!vaultAddress || !/^0x[0-9a-fA-F]{40}$/.test(vaultAddress)) {
+      throw new Error('Harbor Vault contract is not deployed yet. Open /deploy to launch it first.');
+    }
+    if (this.mode !== 'web3' || this.web3ChainId !== ROBINHOOD_MAINNET_CHAIN_ID) {
+      await this.connectMainnetWif();
+    }
+    if (!this.provider || !this.web3Account) {
+      throw new Error('Web3 wallet not connected.');
+    }
+    const data = encodeVaultRecordMatchCalldata(dailySeedYmd, finalNetWorthWif, districtsWon);
+    const hash = (await this.provider.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: this.web3Account.address, to: vaultAddress, value: '0x0', data }],
+    })) as string;
+    const tx: WalletTransaction = {
+      hash,
+      from: this.web3Account.address,
+      to: vaultAddress,
+      amount: 0,
+      timestamp: Date.now(),
+      status: 'confirmed',
+      mode: 'web3',
+    };
+    this.transactions.push(tx);
     this.emitState();
     return tx;
   }

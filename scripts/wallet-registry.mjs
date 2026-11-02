@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { VAULT_EXPECTED_MAINNET_RUNTIME_HEX } from './contract-artifact.mjs';
 
 const ROBINHOOD_MAINNET_RPC =
   process.env.ROBINHOOD_MAINNET_RPC || 'https://rpc.mainnet.chain.robinhood.com';
@@ -374,6 +375,50 @@ async function fetchMainnetTxReceipt(txHash, rpcUrl = ROBINHOOD_MAINNET_RPC) {
   return json?.result || null;
 }
 
+async function fetchMainnetCode(contractAddress, rpcUrl = ROBINHOOD_MAINNET_RPC) {
+  const res = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'eth_getCode',
+      params: [contractAddress, 'latest'],
+    }),
+    signal: AbortSignal.timeout(4500),
+  });
+  if (!res.ok) throw new Error(`Robinhood Chain RPC returned HTTP ${res.status}.`);
+  const json = await res.json();
+  if (json?.error) {
+    throw new Error(json.error.message || 'Robinhood Chain RPC error.');
+  }
+  return String(json?.result || '0x');
+}
+
+async function fetchMainnetVaultOwner(contractAddress, rpcUrl = ROBINHOOD_MAINNET_RPC) {
+  const res = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'eth_call',
+      params: [{ to: contractAddress, data: '0x8da5cb5b' }, 'latest'],
+    }),
+    signal: AbortSignal.timeout(4500),
+  });
+  if (!res.ok) throw new Error(`Robinhood Chain RPC returned HTTP ${res.status}.`);
+  const json = await res.json();
+  const raw = String(json?.result || '').replace(/^0x/i, '');
+  if (raw.length < 40) return null;
+  return '0x' + raw.slice(-40).toLowerCase();
+}
+
+export function buildVaultRegisterMessage(contractAddress) {
+  const norm = String(contractAddress || '').trim().toLowerCase();
+  return `Robin Town Vault Registration\nChain ID: 4663\nContract: ${norm}`;
+}
+
 export function decodeWifTransfersFromReceipt(receipt) {
   if (!receipt || !Array.isArray(receipt.logs)) return [];
   const wifLower = WIF_CONTRACT_MAINNET.toLowerCase();
@@ -432,14 +477,28 @@ export function createWalletRegistry(options = {}) {
     options.fetchBalanceFn !== undefined ? options.fetchBalanceFn : fetchMainnetWifBalance;
   const fetchReceiptFn =
     options.fetchReceiptFn !== undefined ? options.fetchReceiptFn : fetchMainnetTxReceipt;
+  const fetchCodeFn =
+    options.fetchCodeFn !== undefined ? options.fetchCodeFn : fetchMainnetCode;
+  const fetchOwnerFn =
+    options.fetchOwnerFn !== undefined ? options.fetchOwnerFn : fetchMainnetVaultOwner;
   const nowFn = options.nowFn || (() => new Date());
   const rateLimitPerMin = options.rateLimitPerMin ?? 45;
   const matchRateLimitPerMin = options.matchRateLimitPerMin ?? 15;
   const maxBodyBytes = 16_384;
 
+  const envVault = (
+    process.env.HARBOR_VAULT_ADDRESS ||
+    process.env.VITE_HARBOR_VAULT_ADDRESS ||
+    ''
+  ).trim();
+
   let state = {
     version: 2,
     updatedAt: nowFn().toISOString(),
+    vaultContractAddress: /^0x[0-9a-fA-F]{40}$/.test(envVault) ? envVault : null,
+    vaultDeployTxHash: null,
+    vaultDeployerAddress: null,
+    vaultRegisteredAt: null,
     totalMatchesPlayed: 0,
     walletMatchesPlayed: 0,
     guestMatchesPlayed: 0,
@@ -627,6 +686,7 @@ export function createWalletRegistry(options = {}) {
       ok: true,
       storePersistent: storePath.startsWith('/data/'),
       todaySeed,
+      vaultContractAddress: state.vaultContractAddress || null,
       totalUniqueWallets: entries.length,
       verifiedWallets: verifiedCount,
       totalMatchesPlayed: state.totalMatchesPlayed,
@@ -730,7 +790,13 @@ export function createWalletRegistry(options = {}) {
     }
 
     const transfers = decodeWifTransfersFromReceipt(receipt);
-    if (transfers.length === 0) {
+    const activeVaultLower = state.vaultContractAddress
+      ? String(state.vaultContractAddress).trim().toLowerCase()
+      : null;
+    const isVaultInteraction =
+      Boolean(activeVaultLower) &&
+      String(receipt.to || '').trim().toLowerCase() === activeVaultLower;
+    if (transfers.length === 0 && !isVaultInteraction) {
       throw new Error(
         `No official World is Flat ($wif) Transfer logs (${WIF_CONTRACT_MAINNET.slice(0, 8)}…) found in this transaction.`,
       );
@@ -782,7 +848,7 @@ export function createWalletRegistry(options = {}) {
     );
     record.lastVerifiedTxHash = cleanHash;
     record.totalBurnedWif = Number(((record.totalBurnedWif || 0) + wifBurned).toFixed(4));
-    if (record.verifiedOnChainWifMoved >= 1) {
+    if (record.verifiedOnChainWifMoved >= 1 || isVaultInteraction) {
       record.onChainPatronBoost = true;
     }
 
@@ -1046,6 +1112,25 @@ export function createWalletRegistry(options = {}) {
       return true;
     }
 
+    if (req.method === 'GET' && parsed.pathname === '/api/wallets/vault') {
+      sendJson(res, 200, { ok: true, ...getVaultContractInfo() });
+      return true;
+    }
+
+    if (req.method === 'POST' && parsed.pathname === '/api/wallets/vault') {
+      if (!allowRate(clientIp)) {
+        sendJson(res, 429, { ok: false, error: 'Too many requests, try again shortly.' });
+        return true;
+      }
+      readJsonBody(req)
+        .then((body) => registerVaultContract(body))
+        .then((out) => sendJson(res, 200, out))
+        .catch((err) =>
+          sendJson(res, 400, { ok: false, error: err.message || 'Vault registration failed' }),
+        );
+      return true;
+    }
+
     if (req.method === 'POST' && parsed.pathname === '/api/wallets/match') {
       if (!allowMatchRate(clientIp)) {
         sendJson(res, 429, { ok: false, error: 'Too many match submissions, try again shortly.' });
@@ -1062,10 +1147,70 @@ export function createWalletRegistry(options = {}) {
     return true;
   }
 
+  function getVaultContractInfo() {
+    const addr = state.vaultContractAddress || null;
+    return {
+      vaultContractAddress: addr,
+      vaultDeployTxHash: state.vaultDeployTxHash || null,
+      vaultDeployerAddress: state.vaultDeployerAddress || null,
+      vaultRegisteredAt: state.vaultRegisteredAt || null,
+      explorerUrl: addr ? `https://robinhoodchain.blockscout.com/address/${addr}` : null,
+    };
+  }
+
+  async function registerVaultContract({ contractAddress, txHash = null, signature }) {
+    const rawAddr = String(contractAddress || '').trim();
+    if (!/^0x[0-9a-fA-F]{40}$/.test(rawAddr)) {
+      throw new Error('Enter a valid 42-character 0x contract address.');
+    }
+    const cleanTx = txHash ? String(txHash).trim().toLowerCase() : null;
+    if (cleanTx && !isValidTxHash(cleanTx)) {
+      throw new Error('Optional txHash must be a valid 66-character 0x hash.');
+    }
+    if (!fetchCodeFn || !fetchOwnerFn) {
+      throw new Error('On-chain RPC contract verifier is unavailable.');
+    }
+
+    const onChainCode = await fetchCodeFn(rawAddr);
+    if (
+      String(onChainCode || '').toLowerCase() !==
+      VAULT_EXPECTED_MAINNET_RUNTIME_HEX.toLowerCase()
+    ) {
+      throw new Error(
+        'Contract bytecode at this address does not match RobinTownHarborVault compiled for official $wif on Robinhood Chain (4663).',
+      );
+    }
+
+    const onChainOwner = await fetchOwnerFn(rawAddr);
+    if (!onChainOwner || !isValidRealWalletAddress(onChainOwner)) {
+      throw new Error('Could not read owner() from the deployed RobinTownHarborVault contract.');
+    }
+
+    const expectedMessage = buildVaultRegisterMessage(rawAddr);
+    if (!verifyPersonalSign(expectedMessage, String(signature || ''), onChainOwner)) {
+      throw new Error(
+        `Signature must be signed by the contract owner() wallet (${formatShortAddress(onChainOwner)}).`,
+      );
+    }
+
+    state.vaultContractAddress = rawAddr;
+    state.vaultDeployTxHash = cleanTx;
+    state.vaultDeployerAddress = onChainOwner;
+    state.vaultRegisteredAt = nowFn().toISOString();
+    flushToDisk();
+
+    return {
+      ok: true,
+      ...getVaultContractInfo(),
+    };
+  }
+
   return {
     storePath,
     publicSummary,
     getDailyLeaderboard,
+    getVaultContractInfo,
+    registerVaultContract,
     recordConnect,
     verifyWalletSignature,
     verifyOnChainWifTx,
