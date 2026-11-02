@@ -3271,12 +3271,16 @@ dialog#modal {
   box-sizing: border-box;
 }
 
-dialog#modal[data-wif-hub="true"],
 dialog#modal[data-traders-board="true"],
 dialog#modal.trade-dialog,
 dialog#modal.ledger-dialog {
   width: min(1080px, calc(100vw - 24px));
   max-width: min(1080px, calc(100vw - 24px));
+}
+
+dialog#modal[data-wif-hub="true"] {
+  width: min(820px, calc(100vw - 24px));
+  max-width: min(820px, calc(100vw - 24px));
 }
 
 dialog#modal[data-whats-new="true"] {
@@ -3298,13 +3302,26 @@ dialog#modal[data-whats-new="true"] {
   justify-content: space-between;
 }
 
+.wif-hub-footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  background: rgba(18, 43, 30, 0.05);
+  border: 1px solid rgba(18, 43, 30, 0.14);
+  border-radius: 8px;
+}
+
 @media (min-width: 681px) and (max-width: 959px) {
   .wif-hub-sections-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .wif-hub-sections-grid .wif-hub-span-full,
-  .wif-hub-sections-grid .wif-hub-section:last-child {
+  .wif-hub-sections-grid:not(.wif-hub-grid-2x2) .wif-hub-section:last-child {
     grid-column: 1 / -1;
   }
 }
@@ -3312,6 +3329,10 @@ dialog#modal[data-whats-new="true"] {
 @media (min-width: 960px) {
   .wif-hub-sections-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .wif-hub-sections-grid.wif-hub-grid-2x2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .wif-hub-sections-grid .wif-hub-span-full {

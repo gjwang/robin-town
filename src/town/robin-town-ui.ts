@@ -2012,22 +2012,22 @@ export function mountRobinTown(): void {
           <div class="start-brand-hero">
             <h1 class="start-logo">ROBIN<span>TOWN</span></h1>
             <div class="menu-shops" aria-hidden="true">${sprite('shops', 'banhmi')}${sprite('shops', 'coffee')}${sprite('shops', 'pho')}</div>
-            <p class="start-description">Pull up a stool. Bargain for street corners, open neighborhood shops, and put $wif to work in a 6-year trading board game.</p>
+            <p class="start-description">Bargain for corners, open shops, and grow $wif across 6 years.</p>
           </div>
 
           <div class="start-command-col">
             <div class="entry-mode-grid entry-mode-grid-3" role="group" aria-label="Choose match entry mode">
               <button type="button" class="entry-mode-card ${selectedEntryMode === 'casual' ? 'active' : ''}" data-action="select-entry" data-entry-mode="casual">
                 <strong>Casual Town <span class="entry-tag">FREE</span></strong>
-                <small>Zero $wif needed. Beat AI neighbors, earn Town Points, and swap points to $wif (3% burn).</small>
+                <small>Play free vs AI neighbors and earn Town Points.</small>
               </button>
               <button type="button" class="entry-mode-card ${selectedEntryMode === 'daily' ? 'active' : ''}" data-action="select-entry" data-entry-mode="daily">
                 <strong>📅 Daily Seed <span class="entry-tag daily">${escape((walletStats?.todaySeed ?? getTodayHarborSeedKey()).slice(5))}</span></strong>
-                <small>Same 6-year plot & shop deck worldwide today. Build your streak & top the Daily Leaderboard!</small>
+                <small>Same 6-year global deck today. Top the Daily Leaderboard!</small>
               </button>
               <button type="button" class="entry-mode-card ${selectedEntryMode === 'ranked' ? 'active' : ''}" data-action="select-entry" data-entry-mode="ranked">
                 <strong>Ranked Arena <span class="entry-tag">1,000 $WIF</span></strong>
-                <small>4,000 $wif pot: 3,600 $wif Podium Purse, 200 $wif burned forever, 200 $wif to Staking Vault.</small>
+                <small>3,600 $wif Podium Purse with 5% burn and Vault yield.</small>
               </button>
             </div>
 
@@ -2232,38 +2232,30 @@ export function mountRobinTown(): void {
     const connectedPeers = roomSnap?.players.filter((p) => p.connected) ?? [];
     const wsActive = activeRoom?.isCloudRelayActive() ?? false;
     const patronActive = Boolean(walletStats?.me?.onChainPatronBoost);
-    const verifiedTxCount = walletStats?.me?.verifiedTxCount ?? 0;
     const eip6963Wallets = discoverEip6963Wallets();
     const selectedRdns = wallet.getSelectedProviderRdns();
-    const hasProvider = hasInjectedWeb3Provider();
     const vaultAddr = resolveActiveHarborVaultAddress();
     const vaultReady = Boolean(vaultAddr);
+    const blockLabel = onChainProof?.mainnetBlockNumber
+      ? `#${onChainProof.mainnetBlockNumber.toLocaleString('en-US')}`
+      : 'Chain 4663';
 
     modal(
-      '$wif Flywheel, Wallet & Online Rooms',
+      '$wif Wallet, Staking & Rooms',
       `<div class="wif-hub-grid">
-        <div class="wif-stat-box"><small>🔥 Burned Forever</small><strong>${flywheel.totalBurned.toLocaleString('en-US')} $wif</strong></div>
+        <div class="wif-stat-box"><small>🔥 Chain 4663 Burned</small><strong>${totalCombinedBurnedWif().toLocaleString('en-US')} $wif</strong></div>
         <div class="wif-stat-box"><small>🏦 Staking Vault</small><strong>${flywheel.totalStakingYield.toLocaleString('en-US')} $wif</strong></div>
-        <div class="wif-stat-box"><small>🏆 Podium Paid</small><strong>${flywheel.totalPrizesDisbursed.toLocaleString('en-US')} $wif</strong></div>
+        <div class="wif-stat-box"><small>💰 Active Balance</small><strong>${activeBal.toLocaleString('en-US')} $wif</strong></div>
         <div class="wif-stat-box"><small>🌾 Town Points</small><strong>${townPoints.toLocaleString('en-US')} pts</strong></div>
       </div>
 
-      <div class="wif-hub-sections-grid">
-      <section class="wif-hub-section wif-hub-span-full">
-        <h3>1. Official World is Flat ($wif) Wallet · Robinhood Chain Mainnet (${ROBINHOOD_MAINNET_CHAIN_ID})</h3>
-        <p>Play immediately with pre-funded accounts (0 $wif required to enter) or connect MetaMask, Rabby, Coinbase, or any EIP-6963 wallet on <strong>Robinhood Chain Mainnet (${ROBINHOOD_MAINNET_CHAIN_ID})</strong> with official <strong>World is Flat</strong> ERC-20 <code>$wif</code> (<a href="${WIF_BLOCKSCOUT_TOKEN_URL}" target="_blank" rel="noopener"><code>${WIF_TOKEN_CONTRACT_ADDRESS.slice(0, 8)}…${WIF_TOKEN_CONTRACT_ADDRESS.slice(-4)}</code></a>).</p>
-        <div class="wif-row-actions" style="margin-bottom:8px">
-          <a class="robin-chain-pill" href="${WORLD_IS_FLAT_URL}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">🌐 worldisflat.fun</a>
-          <a class="robin-chain-pill" href="${WORLD_IS_FLAT_BUILD_URL}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">🗳️ Vote with $wif (/build)</a>
-          <a class="robin-chain-pill" href="${WORLD_IS_FLAT_FAIR_URL}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">⚖️ World is Fair (/fair)</a>
-          <a class="robin-chain-pill" href="${WIF_PONS_LAUNCHPAD_URL}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">💱 Trade $wif on Pons</a>
-          <a class="robin-chain-pill" href="/changelog" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">📜 Changelog</a>
-          <a class="robin-chain-pill" href="/docs" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">📖 Game Docs</a>
-        </div>
+      <div class="wif-hub-sections-grid wif-hub-grid-2x2">
+      <section class="wif-hub-section">
+        <h3>🦊 1. $wif Wallet (Chain 4663)</h3>
+        <p>Play with a pre-funded guest account or connect MetaMask.</p>
         ${
           eip6963Wallets.length > 0
-            ? `<div class="wif-row-actions eip6963-wallet-row" style="margin-bottom:8px" aria-label="Detected EIP-6963 browser wallets">
-                <span class="muted" style="font-size:11.5px;font-weight:700">Detected Wallets:</span>
+            ? `<div class="wif-row-actions eip6963-wallet-row" style="margin-bottom:6px" aria-label="Detected EIP-6963 browser wallets">
                 ${eip6963Wallets
                   .map(
                     (item) =>
@@ -2273,79 +2265,55 @@ export function mountRobinTown(): void {
               </div>`
             : ''
         }
-        <div class="wif-row-actions" style="margin-bottom:8px">
+        <div class="wif-row-actions" style="margin-bottom:6px">
           ${simAccounts
             .map(
               (acc) =>
-                `<button type="button" class="wif-sim-pill ${wState.mode === 'simulation' && acc.address === activeAddr ? 'active' : ''}" data-action="select-sim-wallet" data-address="${acc.address}">${escape(acc.name)} · ${Math.floor(effectiveAccountBalance(acc.address, acc.balance)).toLocaleString('en-US')} $wif</button>`,
+                `<button type="button" class="wif-sim-pill ${wState.mode === 'simulation' && acc.address === activeAddr ? 'active' : ''}" data-action="select-sim-wallet" data-address="${acc.address}">${escape(acc.name)} · ${Math.floor(effectiveAccountBalance(acc.address, acc.balance)).toLocaleString('en-US')}</button>`,
             )
             .join('')}
         </div>
         <div class="wif-row-actions">
-          <button type="button" class="primary" data-action="connect-mainnet-wif">${wState.mode === 'web3' && wState.status === 'connected' && wState.chainId === ROBINHOOD_MAINNET_CHAIN_ID ? `Mainnet 4663: ${activeAddr.slice(0, 8)}…` : 'Connect Robinhood Chain (4663)'}</button>
-          ${!hasProvider ? `<a class="secondary" href="${escape(buildMetaMaskMobileDeepLink())}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">🦊 Open in MetaMask App ↗</a>` : `<button type="button" class="secondary" data-action="watch-wif-asset">➕ Add $wif to Wallet</button>`}
-          ${currentRealWeb3Address() && !isCurrentWalletVerified() ? `<button type="button" class="secondary" data-action="verify-wallet-sig">✍️ Verify Ownership (+100 pts, 0 gas)</button>` : ''}
-          <button type="button" class="secondary" data-action="burn-mainnet-wif" data-amount="0.1">🔥 Burn 0.1 $wif</button>
-          <button type="button" class="secondary" data-action="burn-mainnet-wif" data-amount="1">🔥 Burn 1 $wif (+150 pts)</button>
-          <button type="button" class="secondary" data-action="patronize-mainnet-wif">🏛️ Patronize 10 $wif (1.20x Boost)</button>
-          <button type="button" class="secondary" data-action="open-traders-board">🏆 Harbor Leaderboard (${walletStats?.totalUniqueWallets ?? 0} Wallets)</button>
-          <button type="button" class="secondary" data-action="connect-web3">${wState.mode === 'web3' && wState.status === 'connected' && wState.chainId === ROBINHOOD_CHAIN_ID ? `Testnet: ${activeAddr.slice(0, 8)}…` : `Testnet (${ROBINHOOD_CHAIN_ID})`}</button>
-          <span class="muted" style="font-size:12px">Active Balance: <strong>${activeBal.toLocaleString('en-US')} $wif</strong>${verifiedTxCount > 0 ? ` · ⛓️ ${verifiedTxCount} Verified Tx` : ''}</span>
-          ${
-            onChainProof
-              ? `<span class="robin-chain-pill" style="font-size:11px">● Block #${onChainProof.mainnetBlockNumber.toLocaleString('en-US')} · <a href="${BURN_EXPLORER_URL}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${Math.round(onChainProof.burnedDeadBalanceWif).toLocaleString('en-US')} $wif burned on-chain</a></span>`
-              : `<button type="button" class="artbook-link" data-action="refresh-onchain" style="font-size:11px">Verify live Robinhood Chain RPC</button>`
-          }
+          <button type="button" class="primary" data-action="connect-mainnet-wif">${wState.mode === 'web3' && wState.status === 'connected' && wState.chainId === ROBINHOOD_MAINNET_CHAIN_ID ? `✓ ${activeAddr.slice(0, 6)}…${activeAddr.slice(-4)}` : '🦊 Connect Chain 4663'}</button>
+          <button type="button" class="secondary" data-action="burn-mainnet-wif" data-amount="1">🔥 Burn 1 $wif</button>
+          <button type="button" class="secondary" data-action="open-traders-board">🏆 Rank (${walletStats?.totalUniqueWallets ?? 0})</button>
         </div>
-        <div class="tx-verify-row">
-          <input id="verify-tx-hash-input" class="tx-hash-input" type="text" maxlength="66" placeholder="Paste Chain 4663 $wif tx hash (0x...)" value="${escape(lastMainnetTxHash ?? lastPastedTxHash)}" aria-label="Robinhood Chain 4663 $wif transaction hash" />
-          <button type="button" class="secondary" data-action="verify-onchain-tx" ${txVerifyPending ? 'disabled' : ''}>${txVerifyPending ? '⏳ Checking RPC…' : '⛓️ Verify On-Chain Tx (+150 pts)'}</button>
-          ${lastMainnetTxHash ? `<button type="button" class="secondary" data-action="copy-onchain-tx">Copy Tx Hash</button>` : ''}
-        </div>
-        ${
-          lastMainnetTxHash
-            ? `<div class="wif-row-actions" style="margin-top:6px">
-                <span class="robin-chain-pill" style="font-size:11px">✓ Verified Chain 4663 Tx: <a href="${ROBINHOOD_MAINNET_EXPLORER_URL}/tx/${lastMainnetTxHash}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline"><code>${lastMainnetTxHash.slice(0, 12)}…${lastMainnetTxHash.slice(-6)}</code> ↗</a></span>
-              </div>`
-            : ''
-        }
       </section>
 
       <section class="wif-hub-section">
-        <h3>2. $wif Staking, Harbor Vault &amp; On-Chain Match Anchor (Chain 4663)</h3>
-        <p>Lock 500 $wif in local Staking Vault (or stake &gt;= 10 $wif in <strong>RobinTownHarborVault</strong> on Chain 4663) for <strong>1.20x</strong> shop paydays, and anchor your Year 6 scores on chain to mint soulbound <code>RTOWN</code> Harbor Reputation.</p>
+        <h3>🏦 2. 1.20x Staking &amp; Vault</h3>
+        <p>Stake $wif for 1.20x shop paydays and on-chain reputation.</p>
+        <div class="wif-row-actions" style="margin-bottom:6px">
+          <span class="robin-chain-pill" style="font-size:11px;color:#14422c;background:rgba(20,66,44,0.1);border-color:rgba(20,66,44,0.28)">${patronActive ? '✓ 1.20x Patron Active' : isStaked() ? '✓ 500 $wif Staked (1.20x)' : 'Base Yield: 1.00x'}</span>
+          <button type="button" class="secondary" data-action="patronize-mainnet-wif">🏛️ Patronize 10 $wif</button>
+        </div>
         <div class="wif-row-actions">
-          <button type="button" class="primary" data-action="toggle-stake">${stakedWif >= 500 ? 'Unstake 500 $wif (Active 1.20x)' : 'Stake 500 $wif -> Activate 1.20x Boost'}</button>
+          <button type="button" class="primary" data-action="toggle-stake">${stakedWif >= 500 ? 'Unstake 500 $wif' : 'Stake 500 $wif (1.20x)'}</button>
           ${
             vaultReady
-              ? `<button type="button" class="secondary" data-action="stake-mainnet-vault">⛓️ Vault Stake 10 $wif</button>
-                 <button type="button" class="secondary" data-action="unstake-mainnet-vault">⛓️ Vault Unstake 10 $wif</button>
-                 <button type="button" class="secondary" data-action="anchor-match-onchain">⛓️ Anchor Score On-Chain</button>
-                 <a class="robin-chain-pill" href="${ROBINHOOD_MAINNET_EXPLORER_URL}/address/${escape(vaultAddr)}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">🏛️ Vault: ${escape(vaultAddr.slice(0, 8))}…${escape(vaultAddr.slice(-4))} ↗</a>`
-              : `<a class="secondary" href="/deploy" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">🛠️ Deploy Game Contract Studio (/deploy) ↗</a>`
+              ? `<button type="button" class="secondary" data-action="anchor-match-onchain">⛓️ Anchor Score</button>`
+              : `<a class="secondary" href="/deploy" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">🚀 Deploy Vault ↗</a>`
           }
-          <span class="muted" style="font-size:12px">${patronActive ? '⛓️ 1.20x On-Chain Patron Boost permanently active!' : isStaked() ? 'Staked: 500 $wif earning boosted street yield' : 'Currently unstaked (1.00x base yield)'}</span>
         </div>
       </section>
 
       <section class="wif-hub-section">
-        <h3>3. Swap Casual Town Points to $wif (3% Deflationary Burn)</h3>
-        <p>Earn Town Points from every deal, streak, and year-end harvest, then redeem points for $wif (10 pts = 1 $wif, 3% burned to <code>${BURN_ADDRESS.slice(0, 10)}…dEaD</code>).</p>
+        <h3>🌾 3. Swap Points to $wif</h3>
+        <p>Redeem Town Points for $wif (10 pts = 1 $wif, 3% burn).</p>
         <div class="wif-row-actions">
-          <button type="button" class="primary" data-action="swap-points" ${swapQuote.netWif <= 0 ? 'disabled' : ''}>Swap ${townPoints} pts -> +${swapQuote.netWif} $wif (Burn ${swapQuote.burnedWif} $wif)</button>
-          <button type="button" class="secondary" data-action="vote-burn">🔥 Burn 100 $wif Community Vote (${communityVotes} cast)</button>
+          <button type="button" class="primary" data-action="swap-points" ${swapQuote.netWif <= 0 ? 'disabled' : ''}>Swap ${townPoints} pts → +${swapQuote.netWif} $wif</button>
+          <button type="button" class="secondary" data-action="vote-burn">🔥 Burn 100 Vote (${communityVotes})</button>
         </div>
       </section>
 
       <section class="wif-hub-section">
-        <h3>4. Cross-Device Online Multiplayer Room Lobby (WebSocket + P2P)</h3>
-        <p>Create a 6-character room code, join an open public table in 1 click, or share an invite link across laptops and phones over live WebSocket relay.</p>
+        <h3>🟢 4. Online 4-Player Rooms</h3>
+        <p>Host or join a 6-character table across any device.</p>
         <div class="wif-row-actions">
-          <button type="button" class="secondary" data-action="create-room">Create Room Code</button>
+          <button type="button" class="primary" data-action="create-room">Create Room</button>
           <input id="join-room-input" class="room-code-input" type="text" maxlength="6" placeholder="CODE6X" value="${activeRoomCode ?? ''}" aria-label="6-character room code" />
-          <button type="button" class="secondary" data-action="join-room">Join Room</button>
-          <button type="button" class="secondary" data-action="refresh-open-rooms">↻ Refresh Tables</button>
-          ${activeRoomCode ? `<button type="button" class="secondary" data-action="copy-room-link">Copy Invite Link</button>` : ''}
+          <button type="button" class="secondary" data-action="join-room">Join</button>
+          ${activeRoomCode ? `<button type="button" class="secondary" data-action="copy-room-link">📋 Link</button>` : ''}
         </div>
         ${
           openRoomsList.length > 0
@@ -2353,42 +2321,45 @@ export function mountRobinTown(): void {
                 ${openRoomsList
                   .map(
                     (rm) => `<div class="open-room-chip">
-                      <span>🟢 <strong>${escape(rm.code)}</strong> · Host: ${escape(rm.hostName)} · ${rm.players}/${rm.maxPlayers} Seats (${escape(rm.status)})</span>
+                      <span>🟢 <strong>${escape(rm.code)}</strong> · ${rm.players}/${rm.maxPlayers} Seats</span>
                       ${
                         activeRoomCode === rm.code
                           ? `<span class="trader-badge verified">Joined ✓</span>`
-                          : `<button type="button" class="secondary" data-action="quick-join-room" data-room="${escape(rm.code)}">Join 1-Click →</button>`
+                          : `<button type="button" class="secondary" data-action="quick-join-room" data-room="${escape(rm.code)}">Join →</button>`
                       }
                     </div>`,
                   )
                   .join('')}
               </div>`
-            : `<p class="muted" style="margin:8px 0 0;font-size:11.5px">No public rooms waiting right now. Click Create Room Code to open Table #1.</p>`
+            : ''
         }
         ${
           activeRoomCode
-            ? `<div class="wif-row-actions" style="margin-top:8px">
-                <span class="robin-chain-pill">Room ${activeRoomCode} · ${connectedPeers.length || 1}/4 Players · ${wsActive ? '● Cloud WebSocket Live' : '● Local P2P Ready'}</span>
-                <span class="muted" style="font-size:12px">Seats: ${connectedPeers.map((p) => `${escape(p.name)} (Seat ${(p.seat ?? 0) + 1}${p.isReady ? ' ✓' : ''})`).join(', ') || 'Waiting for players'}</span>
+            ? `<div class="wif-row-actions" style="margin-top:6px">
+                <span class="robin-chain-pill">Room ${activeRoomCode} · ${connectedPeers.length || 1}/4 · ${wsActive ? 'Cloud Live' : 'P2P Ready'}</span>
                 ${
                   activeRoom?.isLocalHost()
-                    ? `<button type="button" class="primary" data-action="start-online-room">Launch Online Table ▶</button>`
-                    : `<button type="button" class="secondary" data-action="toggle-room-ready">${activeRoom?.getLocalPlayer()?.isReady ? 'Ready ✓' : 'Mark Ready'}</button>`
+                    ? `<button type="button" class="primary" data-action="start-online-room">Start ▶</button>`
+                    : `<button type="button" class="secondary" data-action="toggle-room-ready">${activeRoom?.getLocalPlayer()?.isReady ? 'Ready ✓' : 'Ready'}</button>`
                 }
-              </div>
-              <div class="deal-ping-row" aria-label="Quick tabletop deal pings">
-                <button type="button" class="secondary" data-action="send-room-ping" data-ping="👋 Open to deals!">👋 Open to deals!</button>
-                <button type="button" class="secondary" data-action="send-room-ping" data-ping="☕ Need shop tiles">☕ Need shop tiles</button>
-                <button type="button" class="secondary" data-action="send-room-ping" data-ping="📐 Trading corners">📐 Trading corners</button>
-                <button type="button" class="secondary" data-action="send-room-ping" data-ping="🤝 Nice deal!">🤝 Nice deal!</button>
               </div>`
             : ''
         }
       </section>
       </div>
 
+      <div class="whats-new-footer-bar">
+        <span>⛓️ Robinhood Chain ${blockLabel} · <a href="${WIF_BLOCKSCOUT_TOKEN_URL}" target="_blank" rel="noopener">$wif Token ↗</a></span>
+        <span class="whats-new-feed-links">
+          <a href="${WORLD_IS_FLAT_URL}" target="_blank" rel="noopener">🌐 worldisflat.fun</a> ·
+          <a href="/changelog" target="_blank" rel="noopener">📜 Changelog</a> ·
+          <a href="/docs" target="_blank" rel="noopener">📖 Docs</a> ·
+          <a href="/deploy" target="_blank" rel="noopener">🚀 Deploy</a>
+        </span>
+      </div>
+
       <div class="modal-actions"><button class="primary" data-action="close">Back to Robin-Town ✓</button></div>`,
-      'ROBINHOOD CHAIN · $WIF ECONOMIC ENGINE',
+      'ROBINHOOD CHAIN (4663) · $WIF HUB',
     );
     get('#modal').dataset.wifHub = 'true';
   }
@@ -2414,8 +2385,8 @@ export function mountRobinTown(): void {
       tabBody =
         leaderboardRows.length === 0
           ? `<div class="traders-empty-card">
-              <h3>No wallets on the Harbor Leaderboard yet</h3>
-              <p>Connect MetaMask or Rabby on Robinhood Chain (Chain ID 4663) to claim the #1 harbor seat and earn +50 Town Points immediately.</p>
+              <h3>No Verified Wallets Yet</h3>
+              <p>Connect MetaMask on Chain 4663 to claim #1 (+50 pts).</p>
               <button type="button" class="primary" data-action="connect-mainnet-wif" ${walletFlowState !== 'idle' ? 'disabled' : ''}>🦊 Connect MetaMask / Rabby (Chain 4663)</button>
             </div>`
           : `<div class="traders-table-wrap">
@@ -2459,8 +2430,8 @@ export function mountRobinTown(): void {
       tabBody =
         dailyRows.length === 0
           ? `<div class="traders-empty-card">
-              <h3>📅 Daily Harbor Challenge (${escape(todaySeed)})</h3>
-              <p>Every player worldwide draws the exact same deterministic 6-year land deeds and shop tiles today. Be the first to post a Year-6 score on today's seed!</p>
+              <h3>📅 Daily Seed (${escape(todaySeed)})</h3>
+              <p>Same 6-year deck worldwide today. Post the first score!</p>
               <button type="button" class="primary" data-action="launch-daily-seed">📅 Play Today's Daily Seed ▶</button>
             </div>`
           : `<div class="traders-table-wrap">
@@ -2493,8 +2464,8 @@ export function mountRobinTown(): void {
       tabBody =
         recentRows.length === 0
           ? `<div class="traders-empty-card">
-              <h3>Waiting for the first connected wallet</h3>
-              <p>Every unique MetaMask or Rabby address that connects on Robinhood Chain (4663) appears here automatically with shortened privacy-safe formatting.</p>
+              <h3>No Connected Wallets Yet</h3>
+              <p>Connect MetaMask or Rabby on Chain 4663 to appear here.</p>
               <button type="button" class="primary" data-action="connect-mainnet-wif" ${walletFlowState !== 'idle' ? 'disabled' : ''}>🦊 Connect MetaMask / Rabby</button>
             </div>`
           : `<div class="traders-table-wrap">
@@ -2531,15 +2502,19 @@ export function mountRobinTown(): void {
               </table>
             </div>`;
     } else {
+      const verifyHeading = !realAddr
+        ? '🛡️ Verify Wallet &amp; Tx'
+        : verifiedNow
+          ? '✓ Verified Harbor Trader'
+          : '✍️ Verify Wallet Ownership';
+      const verifySummary = !realAddr
+        ? 'Connect MetaMask (+50 pts), sign 0-gas (+100 pts), or verify a $wif tx.'
+        : verifiedNow
+          ? `Ownership verified on Chain 4663. Best score: ${(me?.bestNetWorthWif ?? 0).toLocaleString('en-US')} $wif.`
+          : 'Sign a free 0-gas message to unlock the Verified badge (+100 pts).';
       tabBody = `<section class="wif-hub-section">
-        <h3>${realAddr ? (verifiedNow ? `✓ Verified Harbor Trader (${escape(realAddr.slice(0, 6))}…${escape(realAddr.slice(-4))})` : `Connected Wallet (${escape(realAddr.slice(0, 6))}…${escape(realAddr.slice(-4))})`) : 'Connect & Verify Your Wallet (0 Gas)'}</h3>
-        <p>${
-          realAddr
-            ? verifiedNow
-              ? `Your EIP-191 personal_sign signature is verified on Robinhood Chain (4663). Best Year-6 score: ${(me?.bestNetWorthWif ?? 0).toLocaleString('en-US')} $wif across ${me?.matchesPlayed ?? 0} matches${(me?.currentStreakDays ?? 0) >= 2 ? ` · 🔥 ${me?.currentStreakDays}-day streak` : ''}.`
-              : 'Sign a gasless off-chain EIP-191 message to prove cryptographic ownership of this 0x address, unlock the ✓ Verified badge on the leaderboard, and earn +100 Town Points.'
-            : 'Step 1: Connect MetaMask or Rabby on Robinhood Chain (4663) (+50 pts). Step 2: Optional 0-gas signature for ✓ Verified badge (+100 pts). Step 3: Paste any Chain 4663 $wif tx hash for +150 pts & 1.20x Patron Boost.'
-        }</p>
+        <h3>${verifyHeading}</h3>
+        <p>${verifySummary}</p>
         ${
           me?.challengeMessage && !verifiedNow
             ? `<code class="challenge-code-box">${escape(me.challengeMessage)}</code>`
@@ -2548,17 +2523,17 @@ export function mountRobinTown(): void {
         <div class="wif-row-actions">
           ${
             !realAddr
-              ? `<button type="button" class="primary" data-action="connect-mainnet-wif" ${walletFlowState !== 'idle' ? 'disabled' : ''}>${walletFlowState === 'connecting' ? '⏳ Connecting…' : '🦊 Connect MetaMask / Rabby (Chain 4663)'}</button>`
+              ? `<button type="button" class="primary" data-action="connect-mainnet-wif" ${walletFlowState !== 'idle' ? 'disabled' : ''}>${walletFlowState === 'connecting' ? '⏳ Connecting…' : '🦊 Connect Chain 4663'}</button>`
               : !verifiedNow
-                ? `<button type="button" class="primary" data-action="verify-wallet-sig" ${walletFlowState !== 'idle' ? 'disabled' : ''}>${walletFlowState === 'signing' ? '⏳ Waiting for Signature…' : '✍️ Sign & Verify Ownership (+100 pts, 0 gas)'}</button>`
-                : `<span class="robin-chain-pill">✓ Ownership Verified${me?.rank ? ` · Rank #${me.rank}` : ''}</span>`
+                ? `<button type="button" class="primary" data-action="verify-wallet-sig" ${walletFlowState !== 'idle' ? 'disabled' : ''}>${walletFlowState === 'signing' ? '⏳ Signing…' : '✍️ Sign & Verify (+100 pts)'}</button>`
+                : `<span class="robin-chain-pill">✓ Verified${me?.rank ? ` · Rank #${me.rank}` : ''}</span>`
           }
-          <button type="button" class="secondary" data-action="refresh-wallet-stats">↻ Refresh Live Telemetry</button>
-          <button type="button" class="secondary" data-action="wif-hub">Open $wif Hub</button>
+          <button type="button" class="secondary" data-action="refresh-wallet-stats">↻ Refresh</button>
+          <button type="button" class="secondary" data-action="wif-hub">💰 $wif Hub</button>
         </div>
-        <div class="tx-verify-row" style="margin-top:10px">
+        <div class="tx-verify-row" style="margin-top:8px">
           <input id="verify-tx-hash-input" class="tx-hash-input" type="text" maxlength="66" placeholder="Paste Chain 4663 $wif tx hash (0x...)" value="${escape(lastMainnetTxHash ?? lastPastedTxHash)}" aria-label="Robinhood Chain 4663 $wif transaction hash" />
-          <button type="button" class="secondary" data-action="verify-onchain-tx" ${txVerifyPending ? 'disabled' : ''}>${txVerifyPending ? '⏳ Checking RPC…' : '⛓️ Verify $wif Tx (+150 pts)'}</button>
+          <button type="button" class="secondary" data-action="verify-onchain-tx" ${txVerifyPending ? 'disabled' : ''}>${txVerifyPending ? '⏳ Checking…' : '⛓️ Verify Tx (+150 pts)'}</button>
         </div>
       </section>`;
     }
