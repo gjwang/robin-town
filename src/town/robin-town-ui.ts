@@ -2052,12 +2052,41 @@ export function mountRobinTown(): void {
             </div>
           </div>
 
-          <div class="start-carousel-wrap">
+          <div class="start-carousel-wrap start-whats-new-box" role="region" aria-label="What's New in Robin Town v1.5.0">
             <div class="start-carousel-header">
-              <span>NEIGHBORHOOD DISTRICTS & $WIF YIELDS</span>
-              <span>6 DISTRICTS · LIVE YIELDS</span>
+              <span>✨ WHAT'S NEW IN v1.5.0</span>
+              <button type="button" class="start-news-all-btn" data-action="whats-new">See All Updates ↗</button>
             </div>
-            <div id="start-apple-carousel"></div>
+            <div class="start-news-grid">
+              <a class="start-news-card" href="/changelog" target="_blank" rel="noopener">
+                <div class="start-news-top">
+                  <strong>📜 Changelog &amp; RSS</strong>
+                  <span class="start-news-tag new">NEW</span>
+                </div>
+                <small>Release notes &amp; XML feeds ↗</small>
+              </a>
+              <a class="start-news-card" href="/docs" target="_blank" rel="noopener">
+                <div class="start-news-top">
+                  <strong>📖 Game &amp; $wif Docs</strong>
+                  <span class="start-news-tag new">NEW</span>
+                </div>
+                <small>6-year rules &amp; contract ABI ↗</small>
+              </a>
+              <a class="start-news-card" href="/deploy" target="_blank" rel="noopener">
+                <div class="start-news-top">
+                  <strong>🚀 Chain 4663 Vault</strong>
+                  <span class="start-news-tag">v1.4</span>
+                </div>
+                <small>1.20x stake &amp; RTOWN score ↗</small>
+              </a>
+              <button type="button" class="start-news-card" data-action="whats-new" data-tab="forecast">
+                <div class="start-news-top">
+                  <strong>🔮 6 Zodiac Events</strong>
+                  <span class="start-news-tag">v1.3</span>
+                </div>
+                <small>Daily seed &amp; Guild Seals ↗</small>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2564,93 +2593,9 @@ export function mountRobinTown(): void {
     const blockLabel = onChainProof?.mainnetBlockNumber
       ? `#${onChainProof.mainnetBlockNumber.toLocaleString('en-US')}`
       : 'Chain 4663';
-    const vaultAddr = resolveActiveHarborVaultAddress();
-    const originUrl =
-      typeof window !== 'undefined' && window.location?.origin
-        ? window.location.origin
-        : 'https://robin-town-production.up.railway.app';
 
     let tabBody = '';
-    if (whatsNewTab === 'highlights') {
-      tabBody = `<div class="whats-new-grid">
-        <section class="wif-hub-section whats-new-card featured">
-          <div class="whats-new-head">
-            <span class="robin-chain-pill">v1.5.0 · LATEST</span>
-            <small class="muted">2026-11-02</small>
-          </div>
-          <h3>Live News, Docs &amp; Feeds</h3>
-          <p class="whats-new-summary">Read game guides, track live $wif burns, and subscribe via RSS or Atom.</p>
-          <div class="whats-new-chips">
-            <span class="whats-new-chip">📜 /changelog</span>
-            <span class="whats-new-chip">📖 /docs</span>
-            <span class="whats-new-chip">📡 RSS + Atom</span>
-            <span class="whats-new-chip">🔥 ${totalCombinedBurnedWif().toLocaleString('en-US')} Burned</span>
-          </div>
-          <div class="wif-row-actions">
-            <a class="secondary" href="/changelog" target="_blank" rel="noopener">📜 Changelog ↗</a>
-            <a class="secondary" href="/docs" target="_blank" rel="noopener">📖 Docs ↗</a>
-            <button type="button" class="secondary" data-action="set-whats-new-tab" data-tab="feeds">📡 Feeds</button>
-          </div>
-        </section>
-
-        <section class="wif-hub-section whats-new-card">
-          <div class="whats-new-head">
-            <span class="robin-chain-pill">v1.4.0 · ON-CHAIN VAULT</span>
-            <small class="muted">2026-11-02</small>
-          </div>
-          <h3>On-Chain Harbor Vault</h3>
-          <p class="whats-new-summary">Stake $wif for 1.20x paydays and anchor Year 6 scores on Chain 4663.</p>
-          <div class="whats-new-chips">
-            <span class="whats-new-chip">⛓️ Chain 4663</span>
-            <span class="whats-new-chip">🛡️ Soulbound RTOWN</span>
-            <span class="whats-new-chip">💰 1.20x Staking</span>
-            <span class="whats-new-chip">🔥 50% Burn Split</span>
-          </div>
-          <div class="wif-row-actions">
-            <a class="secondary" href="/deploy" target="_blank" rel="noopener">🚀 Deploy Studio ↗</a>
-            <button type="button" class="secondary" data-action="wif-hub">💰 $wif Hub</button>
-          </div>
-        </section>
-
-        <section class="wif-hub-section whats-new-card">
-          <div class="whats-new-head">
-            <span class="robin-chain-pill">v1.3.0 · GAMEPLAY</span>
-            <small class="muted">2026-11-02</small>
-          </div>
-          <h3>Zodiac Events &amp; Counter-Deals</h3>
-          <p class="whats-new-summary">Six yearly Zodiac bonuses, +15 $wif Guild Seals, and 1-click AI counter-offers.</p>
-          <div class="whats-new-chips">
-            <span class="whats-new-chip">🔮 6 Zodiac Events</span>
-            <span class="whats-new-chip">🏛️ +15 $wif Seal</span>
-            <span class="whats-new-chip">🤝 1-Click Counter</span>
-            <span class="whats-new-chip">🦊 EIP-6963 Wallets</span>
-          </div>
-          <div class="wif-row-actions">
-            <button type="button" class="secondary" data-action="set-whats-new-tab" data-tab="forecast">🔮 Zodiac Forecast</button>
-            <button type="button" class="secondary" data-action="launch-daily-seed">📅 Play Seed ▶</button>
-          </div>
-        </section>
-
-        <section class="wif-hub-section whats-new-card">
-          <div class="whats-new-head">
-            <span class="robin-chain-pill">v1.2.0 · 3D &amp; ROOMS</span>
-            <small class="muted">2026-11-02</small>
-          </div>
-          <h3>3D City &amp; Online Rooms</h3>
-          <p class="whats-new-summary">Switch Day, Sunset, and Night 3D views or host 4-player rooms.</p>
-          <div class="whats-new-chips">
-            <span class="whats-new-chip">🏙️ Day / Sunset / Night</span>
-            <span class="whats-new-chip">🟢 6-Char Rooms</span>
-            <span class="whats-new-chip">💬 Deal Pings</span>
-            <span class="whats-new-chip">⚡ 1x/3x/8x Fast Play</span>
-          </div>
-          <div class="wif-row-actions">
-            <button type="button" class="secondary" data-action="launch-fast-play">⚡ Fast Play ▶</button>
-            <button type="button" class="secondary" data-action="open-traders-board">🏆 Leaderboard</button>
-          </div>
-        </section>
-      </div>`;
-    } else if (whatsNewTab === 'forecast') {
+    if (whatsNewTab === 'forecast') {
       const dailyPreviewState = newGame(Math.random, 'daily', todaySeed);
       const yearCards = ZODIAC.map((z, idx) => {
         const yr = idx + 1;
@@ -2676,89 +2621,71 @@ export function mountRobinTown(): void {
       </section>
       <div class="whats-new-grid forecast-grid-3">${yearCards}</div>`;
     } else {
-      const feedItems = [
-        {
-          title: '📜 Web Changelog',
-          path: '/changelog',
-          desc: 'Dated release cards for players and HEY Research Lab.',
-        },
-        {
-          title: '📖 Game & $wif Docs',
-          path: '/docs',
-          desc: 'Rules, payout table, Zodiac events, and contract ABI.',
-        },
-        {
-          title: '🚀 Contract Studio',
-          path: '/deploy',
-          desc: '1-click MetaMask deploy and HEY submission kit.',
-        },
-        {
-          title: '📡 RSS 2.0 Feed',
-          path: '/changelog.xml',
-          desc: 'Syndicated XML feed (also /rss.xml and /feed.xml).',
-        },
-        {
-          title: '⚛️ Atom 1.0 Feed',
-          path: '/atom.xml',
-          desc: 'Atom syndication feed with ISO release timestamps.',
-        },
-        {
-          title: '📦 JSON Feed 1.1',
-          path: '/feed.json',
-          desc: 'Machine-readable JSON feed and /updates.json API.',
-        },
-        {
-          title: '🤖 AI & Sitemap Index',
-          path: '/llms.txt',
-          desc: 'Structured crawler summary plus /sitemap.xml.',
-        },
-      ];
-      tabBody = `<div class="whats-new-grid">
-        ${feedItems
-          .map(
-            (item) => `<section class="wif-hub-section whats-new-card">
-              <div class="whats-new-head">
-                <h3>${item.title}</h3>
-                <code>${item.path}</code>
-              </div>
-              <p class="whats-new-summary">${escape(item.desc)}</p>
-              <div class="wif-row-actions">
-                <a class="secondary" href="${item.path}" target="_blank" rel="noopener">Open ↗</a>
-                <button type="button" class="secondary" data-action="copy-feed-url" data-url="${escape(originUrl + item.path)}">📋 Copy</button>
-              </div>
-            </section>`,
-          )
-          .join('')}
-        <section class="wif-hub-section whats-new-card">
-          <div class="whats-new-head">
-            <h3>⛓️ Chain 4663 Explorer</h3>
-            <code>${vaultAddr ? 'Vault Active' : '$wif + RTOWN'}</code>
+      tabBody = `<div class="whats-new-simple-list">
+        <section class="wif-hub-section whats-new-row featured">
+          <div class="whats-new-row-copy">
+            <div class="whats-new-row-title">
+              <span class="whats-new-badge new">NEW · v1.5</span>
+              <h3>📜 Live Changelog &amp; Release Feeds</h3>
+            </div>
+            <p class="whats-new-summary">Read dated release notes and subscribe via RSS, Atom, or JSON.</p>
           </div>
-          <p class="whats-new-summary">Verified $wif token and HarborVault contracts on Robinhood Chain.</p>
-          <div class="wif-row-actions">
-            <a class="secondary" href="${WIF_BLOCKSCOUT_TOKEN_URL}" target="_blank" rel="noopener">Blockscout ↗</a>
-            <a class="secondary" href="https://github.com/harrymove-ctrl/robin-town/releases" target="_blank" rel="noopener">GitHub ↗</a>
-          </div>
+          <a class="primary whats-new-cta" href="/changelog" target="_blank" rel="noopener">Open /changelog ↗</a>
         </section>
+
+        <section class="wif-hub-section whats-new-row">
+          <div class="whats-new-row-copy">
+            <div class="whats-new-row-title">
+              <span class="whats-new-badge new">NEW · v1.5</span>
+              <h3>📖 Game &amp; Smart Contract Docs</h3>
+            </div>
+            <p class="whats-new-summary">Full 6-year rules, storefront payout table, and HarborVault ABI.</p>
+          </div>
+          <a class="secondary whats-new-cta" href="/docs" target="_blank" rel="noopener">Read /docs ↗</a>
+        </section>
+
+        <section class="wif-hub-section whats-new-row">
+          <div class="whats-new-row-copy">
+            <div class="whats-new-row-title">
+              <span class="whats-new-badge">v1.4</span>
+              <h3>🚀 On-Chain Harbor Vault (Chain 4663)</h3>
+            </div>
+            <p class="whats-new-summary">Stake $wif for 1.20x paydays and anchor Year 6 scores on-chain.</p>
+          </div>
+          <a class="secondary whats-new-cta" href="/deploy" target="_blank" rel="noopener">Deploy Studio ↗</a>
+        </section>
+
+        <section class="wif-hub-section whats-new-row">
+          <div class="whats-new-row-copy">
+            <div class="whats-new-row-title">
+              <span class="whats-new-badge">v1.3</span>
+              <h3>🔮 Daily Seed &amp; 6 Zodiac Events</h3>
+            </div>
+            <p class="whats-new-summary">Play today's seed (${escape(todaySeed)}) with Zodiac bonuses and Guild Seals.</p>
+          </div>
+          <button type="button" class="secondary whats-new-cta" data-action="launch-daily-seed">Play Daily Seed ▶</button>
+        </section>
+      </div>
+      <div class="whats-new-footer-bar">
+        <span>🔥 <strong>${totalCombinedBurnedWif().toLocaleString('en-US')} $wif</strong> burned on ${blockLabel}</span>
+        <span class="whats-new-feed-links">
+          <a href="/changelog.xml" target="_blank" rel="noopener">📡 RSS</a> ·
+          <a href="/atom.xml" target="_blank" rel="noopener">⚛️ Atom</a> ·
+          <a href="/feed.json" target="_blank" rel="noopener">📦 JSON</a> ·
+          <a href="/llms.txt" target="_blank" rel="noopener">🤖 llms.txt</a>
+        </span>
       </div>`;
     }
 
     modal(
-      "What's New & Harbor News",
-      `<div class="wif-hub-grid">
-        <div class="wif-stat-box"><small>✨ Release</small><strong>v1.5.0</strong></div>
-        <div class="wif-stat-box"><small>🔥 Chain 4663 Burned</small><strong>${totalCombinedBurnedWif().toLocaleString('en-US')} $wif</strong></div>
-        <div class="wif-stat-box"><small>📅 Today's Seed</small><strong>${escape(todaySeed)}</strong></div>
-        <div class="wif-stat-box"><small>⛓️ Mainnet Block</small><strong>${blockLabel}</strong></div>
-      </div>
-      <div class="traders-tabs" role="tablist" aria-label="What's New & Harbor News tabs">
-        <button type="button" role="tab" aria-selected="${whatsNewTab === 'highlights'}" class="traders-tab-btn ${whatsNewTab === 'highlights' ? 'active' : ''}" data-action="set-whats-new-tab" data-tab="highlights">✨ What's New</button>
-        <button type="button" role="tab" aria-selected="${whatsNewTab === 'forecast'}" class="traders-tab-btn ${whatsNewTab === 'forecast' ? 'active' : ''}" data-action="set-whats-new-tab" data-tab="forecast">🔮 Zodiac Forecast</button>
-        <button type="button" role="tab" aria-selected="${whatsNewTab === 'feeds'}" class="traders-tab-btn ${whatsNewTab === 'feeds' ? 'active' : ''}" data-action="set-whats-new-tab" data-tab="feeds">📡 Feeds &amp; Docs</button>
+      "What's New in Robin Town",
+      `<div class="traders-tabs whats-new-tabs-simple" role="tablist" aria-label="What's New views">
+        <button type="button" role="tab" aria-selected="${whatsNewTab !== 'forecast'}" class="traders-tab-btn ${whatsNewTab !== 'forecast' ? 'active' : ''}" data-action="set-whats-new-tab" data-tab="highlights">✨ Latest Updates (v1.5.0)</button>
+        <button type="button" role="tab" aria-selected="${whatsNewTab === 'forecast'}" class="traders-tab-btn ${whatsNewTab === 'forecast' ? 'active' : ''}" data-action="set-whats-new-tab" data-tab="forecast">🔮 Today's 6-Year Forecast</button>
       </div>
       ${tabBody}
       <div class="modal-actions"><button class="primary" data-action="close">Back to Robin-Town ✓</button></div>`,
-      'ROBIN TOWN · v1.5.0',
+      'ROBIN TOWN · v1.5.0 UPDATE',
     );
     get('#modal').dataset.whatsNew = 'true';
   }
@@ -3429,7 +3356,11 @@ export function mountRobinTown(): void {
         openTradersBoard();
         break;
       case 'whats-new':
-        openWhatsNewModal();
+        openWhatsNewModal(
+          data.tab === 'forecast' || data.tab === 'feeds' || data.tab === 'highlights'
+            ? data.tab
+            : 'highlights',
+        );
         break;
       case 'set-whats-new-tab':
         if (
