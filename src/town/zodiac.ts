@@ -11,3 +11,64 @@ export const zodiacImages = {
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAeZJREFUWIXtVjtIw1AUPRGXjk4GnAQDHToIbQMdQjahUNe6xrEU6uCgLhmy1EXQQilOdnGwOBYUt1BBqHZzEOpaqKNTx7h4y0t5v9ZWHXqWhOS9nHPvPe/eAEv8MYxFfPT9YC+i+62LGynHyjxJWWJdzE0AwXTtmAiVsLkLmBZSAZPRLAJKE5KIYdiVrhWJfdzeBCRmXNVVKhNiunbUb5aEey2vIXyn9AARFssFXa1axIRYBnhpJAGtehvFcgG1sKstoN8s4fayKV0Ty4CqzgBQaQUxkar0A0AvcHB17HI9wvVALN3lQlQr+obIZMOwa1gelCJ28hkM8pkIAB7uXrB/GhoQnQLTtaPJmrfq7Zi4WtE32PUiAWwJiJSF0IRESBCZUNYrPs7v4YxMOCOTSy4UIPICK6LSCiKWXMfxPAhNRx8XRX60/jm+f3t+RTKbQtrvAN/ut7zGuAlB0oiEJdA5EURO1+vdNfQCB5bXQC9wdLbLWzGbYjYTFD2R85DMpgAAab8jDUbaitmN1IAG4WGkIp8GU4/jDffMABOhCr3AkZ4U7WHEQzKbkmaCTCkrwUz/hKZrRyqT6ZDjJxkggmougZOnUexdNZfQIp8LeENGNHh4+N//hL+BmWs0mWYaNqLnS/xbfAFxL8sm77eFrgAAAABJRU5ErkJggg==',
   dog: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAaxJREFUWIXtljFIw0AYhV+i4KSDcShFqIJgwBScukkGd1cnEUFxEHSI4Nahm2AHBQfRRTK5ujsEt06CKSg4KEjpEB3cBLUu/uFyuctdagWHfFBo2pf3v/vvchegoKDgv1Jyaz2V5v7SU2pUPobsppWJL/iRCQDoBq2Eji1crjro3IYAgNmlpsF6AAD58B7SAOyNhB+ZCLyFuKAICkGcnQeJa1kIU1Wcv+YLEbJgrEfJrfX4KUkE6AYtg4rNz5UzDXlkwVgvfmCpAPhpFQDctDu5AvCsr7rx9yyvVACV2aAZ1hW6zev4e+DJ55x0tGhVaHWgX3Q6p+wAmeiOiNXxj6IIZQd0TH5DX1NgVWy8v30kPlbF7iuA9iJkiwOAs32a+i882sDL010uv1wd0BmlVbGlTwjtMcoAfmSmxDJT0e5GuyLrITvYhCcUuGOUVraoA/uNE+zVNxO/0TSwe4eoOLKmQCQeGVMvGdKwR7PMD1kd4KF3gHLVQWP3WKqrH2xhdHpN21dbCMkb0NDVM8adKbyGj/hcnEyNfKABRDzsLMehZg4vcvv96VlQUKDDNz4ToQdXS54hAAAAAElFTkSuQmCC',
 };
+
+export type ZodiacMarketEventId =
+  | 'harbor-cargo'
+  | 'night-festival'
+  | 'morning-bloom'
+  | 'merchant-guild'
+  | 'artisan-ribbon'
+  | 'port-prosperity';
+
+export interface ZodiacMarketEvent {
+  id: ZodiacMarketEventId;
+  icon: string;
+  title: string;
+  shortTag: string;
+  summary: string;
+}
+
+export const ZODIAC_MARKET_EVENTS: readonly ZodiacMarketEvent[] = [
+  {
+    id: 'harbor-cargo',
+    icon: '⚓',
+    title: 'Harbor Cargo Surge',
+    shortTag: 'Harbor & Market +6',
+    summary: 'Each shop group in Harborview or Grand Market earns +6 $wif bonus payday.',
+  },
+  {
+    id: 'night-festival',
+    icon: '🏮',
+    title: 'Night Market Festival',
+    shortTag: 'Coffee & Noodles +6',
+    summary: 'Each Coffee House and Noodle Kitchen group earns +6 $wif festival bonus.',
+  },
+  {
+    id: 'morning-bloom',
+    icon: '🥐',
+    title: 'Morning Bake & Bloom',
+    shortTag: 'Bakery & Flowers +6',
+    summary: 'Each Corner Bakery and Flower Studio group earns +6 $wif morning market bonus.',
+  },
+  {
+    id: 'merchant-guild',
+    icon: '🧵',
+    title: 'Merchant Guild Fair',
+    shortTag: 'Tailor & Grocery +8',
+    summary: 'Each Silk Tailor and Corner Grocer group earns +8 $wif guild trade bonus.',
+  },
+  {
+    id: 'artisan-ribbon',
+    icon: '🏅',
+    title: 'Master Artisan Grant',
+    shortTag: 'Complete Chains +12',
+    summary: 'Every completed storefront chain earns an extra +12 $wif Master Ribbon.',
+  },
+  {
+    id: 'port-prosperity',
+    icon: '⛵',
+    title: 'Port District Boom',
+    shortTag: 'Port Blocks +4/shop',
+    summary: 'Every built shop in Sherwood, Clocktower, or Maple Lane earns +4 $wif port dividend.',
+  },
+];

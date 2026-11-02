@@ -33,6 +33,10 @@ export const WORLD_IS_FLAT_BUILD_URL = 'https://worldisflat.fun/build';
 export const WORLD_IS_FLAT_FAIR_URL = 'https://worldisflat.fun/fair/';
 export const WIF_PONS_LAUNCHPAD_URL =
   'https://www.ponsfamily.com/launchpad/0x5173b8eA6923c2d40267890D45C46a3480954773';
+export const HARBOR_VAULT_CONTRACT_ADDRESS: string = (
+  (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+    ?.VITE_HARBOR_VAULT_ADDRESS || ''
+).trim();
 
 export interface OnChainWifProof {
   ok: boolean;
@@ -147,14 +151,101 @@ export interface OpenMultiplayerRoomSummary {
   updatedAt: number;
 }
 
-export function detectEip1193WalletSource(): string {
+export interface Eip6963ProviderInfo {
+  uuid: string;
+  name: string;
+  icon: string;
+  rdns: string;
+}
+
+export interface Eip6963ProviderDetail {
+  info: Eip6963ProviderInfo;
+  provider: EIP1193Provider;
+}
+
+const discoveredEip6963Providers = new Map<string, Eip6963ProviderDetail>();
+let eip6963ListenerBound = false;
+
+export function registerEip6963Provider(detail: Eip6963ProviderDetail): void {
+  if (!detail?.info || !detail.provider) return;
+  const key = (detail.info.rdns || detail.info.uuid || detail.info.name || '').trim().toLowerCase();
+  if (!key) return;
+  discoveredEip6963Providers.set(key, detail);
+}
+
+export function clearEip6963ProvidersForTest(): void {
+  discoveredEip6963Providers.clear();
+}
+
+export function discoverEip6963Wallets(): Eip6963ProviderDetail[] {
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    if (!eip6963ListenerBound) {
+      eip6963ListenerBound = true;
+      window.addEventListener('eip6963:announceProvider', ((event: Event) => {
+        const custom = event as CustomEvent<Eip6963ProviderDetail>;
+        if (custom?.detail) registerEip6963Provider(custom.detail);
+      }) as EventListener);
+    }
+    try {
+      window.dispatchEvent(new Event('eip6963:requestProvider'));
+    } catch {}
+  }
+  return Array.from(discoveredEip6963Providers.values());
+}
+
+export function hasInjectedWeb3Provider(): boolean {
+  if (discoveredEip6963Providers.size > 0) return true;
+  if (typeof window === 'undefined') return false;
+  return Boolean((window as unknown as { ethereum?: unknown }).ethereum);
+}
+
+export function isMobileBrowserWithoutWallet(
+  userAgent?: string,
+  hasProvider?: boolean,
+): boolean {
+  const ua =
+    userAgent ??
+    (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string'
+      ? navigator.userAgent
+      : '');
+  const injected = hasProvider ?? hasInjectedWeb3Provider();
+  if (injected) return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+}
+
+export function buildMetaMaskMobileDeepLink(currentHref?: string): string {
+  const raw =
+    currentHref ??
+    (typeof window !== 'undefined' && window.location?.href
+      ? window.location.href
+      : 'https://robin-town-production.up.railway.app/');
+  try {
+    const parsed = new URL(raw);
+    const dappTarget = `${parsed.host}${parsed.pathname}${parsed.search}`;
+    return `https://metamask.app.link/dapp/${dappTarget}`;
+  } catch {
+    return 'https://metamask.app.link/dapp/robin-town-production.up.railway.app/';
+  }
+}
+
+export function detectEip1193WalletSource(activeRdns?: string | null): string {
+  if (activeRdns) {
+    const lower = activeRdns.toLowerCase();
+    if (lower.includes('rabby')) return 'rabby';
+    if (lower.includes('metamask')) return 'metamask';
+    if (lower.includes('coinbase')) return 'coinbase';
+    if (lower.includes('phantom')) return 'phantom';
+    if (lower.includes('trust')) return 'trust';
+    return lower.split('.').pop()?.slice(0, 20) || 'eip6963';
+  }
   if (typeof window === 'undefined') return 'eip1193';
   const eth = (window as unknown as {
-    ethereum?: { isRabby?: boolean; isMetaMask?: boolean; isCoinbaseWallet?: boolean };
+    ethereum?: { isRabby?: boolean; isMetaMask?: boolean; isCoinbaseWallet?: boolean; isPhantom?: boolean };
   }).ethereum;
   if (!eth) return 'eip1193';
   if (eth.isRabby) return 'rabby';
   if (eth.isCoinbaseWallet) return 'coinbase';
+  if (eth.isPhantom) return 'phantom';
   if (eth.isMetaMask) return 'metamask';
   return 'eip1193';
 }
@@ -413,6 +504,71 @@ export function encodeErc20Burn(
 }
 
 /**
+ * Encodes `RobinTownHarborVault.stakeWif(uint256)` selector `0x92680b29`.
+ */
+export function encodeVaultStakeWifCalldata(
+  amountTokens: number,
+  decimals: number = WIF_TOKEN_DECIMALS,
+): string {
+  return `0x92680b29${pad32HexUint256(amountTokens, decimals)}`;
+}
+
+/**
+ * Encodes `RobinTownHarborVault.unstakeWif(uint256)` selector `0xea09e357`.
+ */
+export function encodeVaultUnstakeWifCalldata(
+  amountTokens: number,
+  decimals: number = WIF_TOKEN_DECIMALS,
+): string {
+  return `0xea09e357${pad32HexUint256(amountTokens, decimals)}`;
+}
+
+/**
+ * Encodes `RobinTownHarborVault.patronizeDistrict(uint8,uint256)` selector `0x5798edad`.
+ */
+export function encodeVaultPatronizeDistrictCalldata(
+  districtId: number,
+  amountTokens: number,
+  decimals: number = WIF_TOKEN_DECIMALS,
+): string {
+  if (!Number.isInteger(districtId) || districtId < 0 || districtId >= 6) {
+    throw new Error('Harbor districtId must be an integer between 0 and 5.');
+  }
+  const districtHex = districtId.toString(16).padStart(64, '0');
+  return `0x5798edad${districtHex}${pad32HexUint256(amountTokens, decimals)}`;
+}
+
+/**
+ * Encodes `RobinTownHarborVault.enterRankedHarbor(bytes32,uint256)` selector `0x5ef615b7`.
+ */
+export function encodeVaultEnterRankedCalldata(
+  matchLabel: string,
+  amountTokens: number,
+  decimals: number = WIF_TOKEN_DECIMALS,
+): string {
+  const bytes = new TextEncoder().encode(matchLabel.slice(0, 32));
+  let matchHex = '';
+  for (let i = 0; i < 32; i++) {
+    matchHex += (bytes[i] ?? 0).toString(16).padStart(2, '0');
+  }
+  return `0x5ef615b7${matchHex}${pad32HexUint256(amountTokens, decimals)}`;
+}
+
+/**
+ * Encodes `RobinTownHarborVault.hasPaydayBoost(address)` selector `0x64295ca5`.
+ */
+export function encodeVaultHasPaydayBoostCalldata(trader: string): string {
+  return `0x64295ca5${pad32HexAddress(trader)}`;
+}
+
+/**
+ * Encodes `RobinTownHarborVault.stakedBalanceOf(address)` selector `0x16765391`.
+ */
+export function encodeVaultStakedBalanceOfCalldata(trader: string): string {
+  return `0x16765391${pad32HexAddress(trader)}`;
+}
+
+/**
  * Fetches live on-chain `$wif` contract state & `0x...dEaD` burn telemetry from Robinhood Chain.
  * Uses local `/api/onchain-wif` relay first (for zero CORS friction), falling back to direct JSON-RPC.
  */
@@ -636,6 +792,7 @@ export class WalletAdapter {
   private mode: WalletMode;
   private status: WalletStatus = 'disconnected';
   private provider: EIP1193Provider | null = null;
+  private selectedProviderRdns: string | null = null;
   private chainConfig: WalletChainConfig;
   private simBalances: Map<string, number> = new Map();
   private simAllowances: Map<string, Map<string, number>> = new Map();
@@ -1262,8 +1419,17 @@ export class WalletAdapter {
    */
   public async connectMainnetWif(): Promise<WalletAccount> {
     if (!this.provider && typeof window !== 'undefined') {
-      const eth = (window as unknown as { ethereum?: EIP1193Provider }).ethereum;
-      if (eth) this.provider = eth;
+      const discovered = discoverEip6963Wallets();
+      if (discovered.length > 0) {
+        const preferred =
+          discovered.find((w) => /metamask|rabby/i.test(w.info.rdns || w.info.name)) ||
+          discovered[0];
+        this.provider = preferred.provider;
+        this.selectedProviderRdns = preferred.info.rdns || preferred.info.name;
+      } else {
+        const eth = (window as unknown as { ethereum?: EIP1193Provider }).ethereum;
+        if (eth) this.provider = eth;
+      }
     }
     if (!this.provider) {
       throw new Error('No browser Web3 wallet (MetaMask or Rabby) detected.');
@@ -1350,22 +1516,180 @@ export class WalletAdapter {
   }
 
   /**
-   * Patronizes the Harbor Vault on Robinhood Chain Mainnet (`4663`) using `$wif` (`10 $wif` default)
+   * Selects a discovered EIP-6963 multi-wallet provider (e.g. MetaMask, Rabby, Coinbase, Phantom)
+   * without window.ethereum provider shadowing.
+   */
+  public selectEip6963Provider(rdnsOrUuid: string): boolean {
+    const key = rdnsOrUuid.trim().toLowerCase();
+    const providers = discoverEip6963Wallets();
+    const found = providers.find(
+      (item) =>
+        item.info.rdns.toLowerCase() === key ||
+        item.info.uuid.toLowerCase() === key ||
+        item.info.name.toLowerCase() === key,
+    );
+    if (!found) return false;
+    this.teardownProviderListeners();
+    this.provider = found.provider;
+    this.selectedProviderRdns = found.info.rdns || found.info.name;
+    return true;
+  }
+
+  public getSelectedProviderRdns(): string | null {
+    return this.selectedProviderRdns;
+  }
+
+  /**
+   * Prompts the active Web3 wallet via EIP-747 `wallet_watchAsset` to add official `$wif` (`4663`).
+   */
+  public async watchMainnetWifAsset(): Promise<boolean> {
+    if (!this.provider && typeof window !== 'undefined') {
+      const wallets = discoverEip6963Wallets();
+      if (wallets.length > 0) this.provider = wallets[0].provider;
+      else {
+        const eth = (window as unknown as { ethereum?: EIP1193Provider }).ethereum;
+        if (eth) this.provider = eth;
+      }
+    }
+    if (!this.provider) {
+      throw new Error('Connect MetaMask or Rabby first to add the $wif token.');
+    }
+    const added = await this.provider.request({
+      method: 'wallet_watchAsset',
+      params: {
+        type: 'ERC20',
+        options: {
+          address: WIF_TOKEN_CONTRACT_ADDRESS,
+          symbol: WIF_TOKEN_SYMBOL,
+          decimals: WIF_TOKEN_DECIMALS,
+        },
+      },
+    });
+    return Boolean(added);
+  }
+
+  /**
+   *Patronizes the Harbor Vault on Robinhood Chain Mainnet (`4663`) using `$wif` (`10 $wif` default)
    * to unlock the verified `1.20x` On-Chain Patron Payday Boost.
+   * Uses `RobinTownHarborVault.patronizeDistrict` when `HARBOR_VAULT_CONTRACT_ADDRESS` is configured.
    */
   public async patronizeMainnetWif(
     amountTokens: number = 10,
-    vaultRecipient: string = BURN_ADDRESS,
+    vaultRecipient: string = HARBOR_VAULT_CONTRACT_ADDRESS || BURN_ADDRESS,
+    districtId: number = 0,
   ): Promise<WalletTransaction> {
     if (this.mode !== 'web3' || this.web3ChainId !== ROBINHOOD_MAINNET_CHAIN_ID) {
       await this.connectMainnetWif();
     }
-    const tx = await this.transferErc20(vaultRecipient, amountTokens, WIF_TOKEN_CONTRACT_ADDRESS);
+    if (
+      vaultRecipient &&
+      vaultRecipient.toLowerCase() !== BURN_ADDRESS.toLowerCase() &&
+      /^0x[0-9a-fA-F]{40}$/.test(vaultRecipient) &&
+      this.provider &&
+      this.web3Account
+    ) {
+      await this.approveErc20(vaultRecipient, amountTokens, WIF_TOKEN_CONTRACT_ADDRESS);
+      const data = encodeVaultPatronizeDistrictCalldata(districtId, amountTokens, WIF_TOKEN_DECIMALS);
+      const hash = (await this.provider.request({
+        method: 'eth_sendTransaction',
+        params: [{ from: this.web3Account.address, to: vaultRecipient, value: '0x0', data }],
+      })) as string;
+      const tx: WalletTransaction = {
+        hash,
+        from: this.web3Account.address,
+        to: vaultRecipient,
+        amount: amountTokens,
+        timestamp: Date.now(),
+        status: 'confirmed',
+        mode: 'web3',
+      };
+      this.transactions.push(tx);
+      const nextBal = await this.getErc20Balance(this.web3Account.address, WIF_TOKEN_CONTRACT_ADDRESS);
+      this.web3Account.balance = Number(nextBal.toFixed(4));
+      this.emitState();
+      return tx;
+    }
+    const tx = await this.transferErc20(BURN_ADDRESS, amountTokens, WIF_TOKEN_CONTRACT_ADDRESS);
     if (this.web3Account) {
       const nextBal = await this.getErc20Balance(this.web3Account.address, WIF_TOKEN_CONTRACT_ADDRESS);
       this.web3Account.balance = Number(nextBal.toFixed(4));
       this.emitState();
     }
+    return tx;
+  }
+
+  /**
+   * Stakes `$wif` into `RobinTownHarborVault.stakeWif(uint256)` on Robinhood Chain Mainnet (`4663`).
+   */
+  public async stakeMainnetVaultWif(
+    amountTokens: number = 500,
+    vaultAddress: string = HARBOR_VAULT_CONTRACT_ADDRESS,
+  ): Promise<WalletTransaction> {
+    if (!vaultAddress || !/^0x[0-9a-fA-F]{40}$/.test(vaultAddress)) {
+      throw new Error('Harbor Vault contract address is not configured.');
+    }
+    if (this.mode !== 'web3' || this.web3ChainId !== ROBINHOOD_MAINNET_CHAIN_ID) {
+      await this.connectMainnetWif();
+    }
+    if (!this.provider || !this.web3Account) {
+      throw new Error('Web3 wallet not connected.');
+    }
+    await this.approveErc20(vaultAddress, amountTokens, WIF_TOKEN_CONTRACT_ADDRESS);
+    const data = encodeVaultStakeWifCalldata(amountTokens, WIF_TOKEN_DECIMALS);
+    const hash = (await this.provider.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: this.web3Account.address, to: vaultAddress, value: '0x0', data }],
+    })) as string;
+    const tx: WalletTransaction = {
+      hash,
+      from: this.web3Account.address,
+      to: vaultAddress,
+      amount: amountTokens,
+      timestamp: Date.now(),
+      status: 'confirmed',
+      mode: 'web3',
+    };
+    this.transactions.push(tx);
+    const nextBal = await this.getErc20Balance(this.web3Account.address, WIF_TOKEN_CONTRACT_ADDRESS);
+    this.web3Account.balance = Number(nextBal.toFixed(4));
+    this.emitState();
+    return tx;
+  }
+
+  /**
+   * Unstakes `$wif` from `RobinTownHarborVault.unstakeWif(uint256)` on Robinhood Chain Mainnet (`4663`).
+   */
+  public async unstakeMainnetVaultWif(
+    amountTokens: number = 500,
+    vaultAddress: string = HARBOR_VAULT_CONTRACT_ADDRESS,
+  ): Promise<WalletTransaction> {
+    if (!vaultAddress || !/^0x[0-9a-fA-F]{40}$/.test(vaultAddress)) {
+      throw new Error('Harbor Vault contract address is not configured.');
+    }
+    if (this.mode !== 'web3' || this.web3ChainId !== ROBINHOOD_MAINNET_CHAIN_ID) {
+      await this.connectMainnetWif();
+    }
+    if (!this.provider || !this.web3Account) {
+      throw new Error('Web3 wallet not connected.');
+    }
+    const data = encodeVaultUnstakeWifCalldata(amountTokens, WIF_TOKEN_DECIMALS);
+    const hash = (await this.provider.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: this.web3Account.address, to: vaultAddress, value: '0x0', data }],
+    })) as string;
+    const tx: WalletTransaction = {
+      hash,
+      from: this.web3Account.address,
+      to: vaultAddress,
+      amount: amountTokens,
+      timestamp: Date.now(),
+      status: 'confirmed',
+      mode: 'web3',
+    };
+    this.transactions.push(tx);
+    const nextBal = await this.getErc20Balance(this.web3Account.address, WIF_TOKEN_CONTRACT_ADDRESS);
+    this.web3Account.balance = Number(nextBal.toFixed(4));
+    this.emitState();
     return tx;
   }
 

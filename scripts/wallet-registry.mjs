@@ -423,6 +423,9 @@ function makeDefaultWalletRecord(norm, nowIso, chainId = 4663, source = 'eip1193
   };
 }
 
+export const MAX_PLAUSIBLE_NET_WORTH_WIF = 250_000;
+export const MAX_PLAUSIBLE_BURN_WIF = 50_000;
+
 export function createWalletRegistry(options = {}) {
   const storePath = options.storePath || resolveDefaultStorePath();
   const fetchBalanceFn =
@@ -430,6 +433,8 @@ export function createWalletRegistry(options = {}) {
   const fetchReceiptFn =
     options.fetchReceiptFn !== undefined ? options.fetchReceiptFn : fetchMainnetTxReceipt;
   const nowFn = options.nowFn || (() => new Date());
+  const rateLimitPerMin = options.rateLimitPerMin ?? 45;
+  const matchRateLimitPerMin = options.matchRateLimitPerMin ?? 15;
   const maxBodyBytes = 16_384;
 
   let state = {
@@ -486,19 +491,26 @@ export function createWalletRegistry(options = {}) {
 
   loadFromDisk();
 
-  // Simple per-IP sliding window rate limiter (max 45 mutating calls per 60s)
+  // Sliding window rate limiter per IP (separate tighter bucket for match score posts)
   const ipBuckets = new Map();
-  function allowRate(ip) {
+  const matchIpBuckets = new Map();
+  function allowBucket(map, ip, limit) {
     const key = String(ip || 'local');
     const now = Date.now();
-    const bucket = ipBuckets.get(key);
+    const bucket = map.get(key);
     if (!bucket || now - bucket.windowStart > 60_000) {
-      ipBuckets.set(key, { windowStart: now, count: 1 });
+      map.set(key, { windowStart: now, count: 1 });
       return true;
     }
-    if (bucket.count >= 45) return false;
+    if (bucket.count >= limit) return false;
     bucket.count += 1;
     return true;
+  }
+  function allowRate(ip) {
+    return allowBucket(ipBuckets, ip, rateLimitPerMin);
+  }
+  function allowMatchRate(ip) {
+    return allowRate(ip) && allowBucket(matchIpBuckets, ip, matchRateLimitPerMin);
   }
 
   function getDailyLeaderboard(dateKey = utcDateKey(nowFn())) {
@@ -819,8 +831,20 @@ export function createWalletRegistry(options = {}) {
     dailySeed = null,
     playerName = null,
   }) {
-    const safeWorth = Math.max(0, Math.min(1_000_000, Math.round(Number(finalNetWorthWif) || 0)));
-    const safeBurn = Math.max(0, Math.min(100_000, Number(burnedWif) || 0));
+    const rawWorth = Number(finalNetWorthWif);
+    if (!Number.isFinite(rawWorth) || rawWorth < 0 || rawWorth > MAX_PLAUSIBLE_NET_WORTH_WIF) {
+      throw new Error(
+        `Match net worth must be between 0 and ${MAX_PLAUSIBLE_NET_WORTH_WIF.toLocaleString('en-US')} $wif.`,
+      );
+    }
+    const rawBurn = Number(burnedWif ?? 0);
+    if (!Number.isFinite(rawBurn) || rawBurn < 0 || rawBurn > MAX_PLAUSIBLE_BURN_WIF) {
+      throw new Error(
+        `Match burned $wif must be between 0 and ${MAX_PLAUSIBLE_BURN_WIF.toLocaleString('en-US')} $wif.`,
+      );
+    }
+    const safeWorth = Math.round(rawWorth);
+    const safeBurn = Number(rawBurn.toFixed(4));
     const nowDate = nowFn();
     const nowIso = nowDate.toISOString();
     const todayKey = utcDateKey(nowDate);
@@ -1023,8 +1047,8 @@ export function createWalletRegistry(options = {}) {
     }
 
     if (req.method === 'POST' && parsed.pathname === '/api/wallets/match') {
-      if (!allowRate(clientIp)) {
-        sendJson(res, 429, { ok: false, error: 'Too many requests, try again shortly.' });
+      if (!allowMatchRate(clientIp)) {
+        sendJson(res, 429, { ok: false, error: 'Too many match submissions, try again shortly.' });
         return true;
       }
       readJsonBody(req)

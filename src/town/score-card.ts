@@ -244,15 +244,24 @@ export function downloadEmpireScoreCard(payload: ScoreCardPayload): boolean {
 export function buildEmpireXShareUrl(payload: ScoreCardPayload): string {
   const ranked = rankings(payload.state);
   const myPlace = ranked.findIndex((p) => p.id === 0) + 1;
-  const myCash = payload.state.players[0]?.cash ?? 0;
+  const myCash = Math.max(0, Math.round(payload.state.players[0]?.cash ?? 0));
+  const seed = payload.state.dailySeed;
   const modeTag =
     payload.state.entryMode === 'daily'
-      ? `on Daily Harbor Seed #${payload.state.dailySeed || 'Today'}`
+      ? `on Daily Harbor Seed #${seed || 'Today'}`
       : 'in Robin Town';
+  const shareParams = new URLSearchParams();
+  if (payload.state.entryMode === 'daily' && seed) {
+    shareParams.set('daily', seed);
+  }
+  if (myCash > 0) {
+    shareParams.set('target', String(myCash));
+  }
+  const shareLink = `https://robin-town-production.up.railway.app/${shareParams.toString() ? `?${shareParams.toString()}` : ''}`;
   const text = [
     `Finished #${myPlace} with ${myCash.toLocaleString('en-US')} $wif ${modeTag} on Robinhood Chain (4663)!`,
-    `Build 3D harbor shophouses, haggle OTC deals & put World is Flat ($wif) to work:`,
-    `https://robin-town-production.up.railway.app`,
+    `Can you beat my ${myCash.toLocaleString('en-US')} $wif harbor empire? Pull up a stool & put World is Flat ($wif) to work:`,
+    shareLink,
   ].join('\n');
   return `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`;
 }

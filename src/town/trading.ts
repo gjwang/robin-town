@@ -1,11 +1,13 @@
 import {
   SHOPS,
+  detectRivalMonopolyRisk,
   holdings,
   emptyOffer,
   evaluateOffer,
   findSmartPlayerTrade,
   groups,
   neighbors,
+  proposeBotCounterOffer,
   trade,
 } from './engine';
 import { query as $, required as get, errorMessage } from './dom';
@@ -170,13 +172,24 @@ export function createTrading({
       if (check.accepted) {
         return `<div class="deal-meter accepted"><span>✓</span><span><strong>Fair Win-Win!</strong> ${partnerName} likes this package and is ready to shake hands.</span><button type="button" class="deal-meter-clear" data-bargain="clear-mat">Clear</button></div>`;
       }
+      const counter = proposeBotCounterOffer(s, draft);
+      const counterBtn = counter
+        ? `<button type="button" class="deal-meter-sweeten" data-bargain="accept-counter" title="${counter.summary}">🤝 ${counter.actionLabel}</button>`
+        : '';
       if (check.shortfall > 0 && check.shortfall <= 30 && draft.give.cash + check.shortfall <= youCash) {
-        return `<div class="deal-meter close"><span>≈</span><span><strong>Almost there!</strong> Add <strong>+${check.shortfall} $wif</strong> (or 1 piece) for ${partnerName} to accept.</span><button type="button" class="deal-meter-sweeten" data-bargain="sweeten" data-shortfall="${check.shortfall}">+${check.shortfall} $wif ✓</button><button type="button" class="deal-meter-clear" data-bargain="clear-mat">Clear</button></div>`;
+        return `<div class="deal-meter close"><span>≈</span><span><strong>Almost there!</strong> ${counter ? counter.summary : `Add +${check.shortfall} $wif (or 1 piece) for ${partnerName} to accept.`}</span><button type="button" class="deal-meter-sweeten" data-bargain="sweeten" data-shortfall="${check.shortfall}">+${check.shortfall} $wif ✓</button>${counterBtn}<button type="button" class="deal-meter-clear" data-bargain="clear-mat">Clear</button></div>`;
       }
-      return `<div class="deal-meter wide"><span>◔</span><span>Needs ~<strong>${check.shortfall} $wif</strong> more value (cash, tile, or adjacent plot) for ${partnerName}.</span><button type="button" class="deal-meter-clear" data-bargain="clear-mat">Clear</button></div>`;
+      return `<div class="deal-meter wide"><span>◔</span><span>${counter ? `<strong>${counter.summary}</strong>` : `Needs ~<strong>${check.shortfall} $wif</strong> more value (cash, tile, or adjacent plot) for ${partnerName}.`}</span>${counterBtn}<button type="button" class="deal-meter-clear" data-bargain="clear-mat">Clear</button></div>`;
     } catch {
       return '';
     }
+  }
+  function rivalRiskBanner(s: GameState, busy: boolean): string {
+    if (busy || status === 'accepted') return '';
+    if (!hasItems(draft.give)) return '';
+    const risk = detectRivalMonopolyRisk(s, draft);
+    if (!risk) return '';
+    return `<div class="rival-monopoly-alert" role="alert"><span>⚠️</span><span>${risk}</span></div>`;
   }
   function inventory(player: number, side: TradeSide): string {
     const s = getState(),
@@ -216,8 +229,8 @@ export function createTrading({
     ${
       done
         ? `<div class="deal-receipt"><strong>Deal sealed. Your plots, shop pieces, and $wif changed hands.</strong><p>${lastTax > 0 ? `1% OTC protocol fee (${lastTax} $wif) routed into the Robinhood Chain Staking Vault.` : 'Direct asset swap settled with zero cash fee.'}</p><button class="primary" data-bargain="again">Another deal</button><button class="secondary" data-action="close">Back to town</button></div>`
-        : `${liveDealMeter(s, p.name, busy)}<fieldset class="barter-table" ${busy ? 'disabled' : ''}><legend class="sr-only">Your two-sided trade offer</legend>${inventory(0, 'give')}<div class="barter-divider" aria-hidden="true">⇄</div>${inventory(p.id, 'take')}</fieldset>
-    <div class="barter-bottom"><span>Tap an item to add it. ★ marks tiles and plots that connect to your shops! (1% $wif cash fee feeds Staking Vault)</span>${status === 'rejected' && shortfall > 0 && draft.give.cash + shortfall <= playerAt(s, 0).cash ? `<button class="secondary" data-bargain="counter">Add ${shortfall} $wif</button>` : ''}<button class="primary bargain-submit" data-bargain="propose" ${busy || (!hasItems(draft.give) && !hasItems(draft.take)) ? 'disabled' : ''}>${busy ? 'Counting the offer…' : 'How about this?'}</button></div>`
+        : `${liveDealMeter(s, p.name, busy)}${rivalRiskBanner(s, busy)}<fieldset class="barter-table" ${busy ? 'disabled' : ''}><legend class="sr-only">Your two-sided trade offer</legend>${inventory(0, 'give')}<div class="barter-divider" aria-hidden="true">⇄</div>${inventory(p.id, 'take')}</fieldset>
+    <div class="barter-bottom"><span>Tap an item to add it. ★ marks tiles and plots that connect to your shops! (1% $wif cash fee feeds Staking Vault)</span>${status === 'rejected' && proposeBotCounterOffer(s, draft) ? `<button class="secondary" data-bargain="accept-counter">🤝 ${proposeBotCounterOffer(s, draft)!.actionLabel}</button>` : status === 'rejected' && shortfall > 0 && draft.give.cash + shortfall <= playerAt(s, 0).cash ? `<button class="secondary" data-bargain="counter">Add ${shortfall} $wif</button>` : ''}<button class="primary bargain-submit" data-bargain="propose" ${busy || (!hasItems(draft.give) && !hasItems(draft.take)) ? 'disabled' : ''}>${busy ? 'Counting the offer…' : 'How about this?'}</button></div>`
     }`;
   }
   function render(): void {
@@ -284,6 +297,14 @@ export function createTrading({
         status = 'idle';
         shortfall = 0;
         message = 'That swap connects both of our blocks nicely. Ready to shake hands?';
+      }
+    } else if (action === 'accept-counter') {
+      const counter = proposeBotCounterOffer(getState(), draft);
+      if (counter) {
+        draft = JSON.parse(JSON.stringify(counter.counterOffer)) as TradeOffer;
+        status = 'idle';
+        shortfall = 0;
+        message = 'Now we are talking! Ready to shake hands on this counter-offer?';
       }
     } else if (action === 'sweeten') {
       const addAmt = Math.max(0, Number(el.dataset.shortfall || 0));

@@ -10,7 +10,11 @@ import {
   COMPLETE,
   INCOMPLETE,
   KEEP,
+  DISTRICT_MAJORITY_BONUS,
   getTodayHarborSeedKey,
+  getYearMarketEvent,
+  getPlayerDistrictMajorities,
+  incomeBreakdown,
   newGame,
   neighbors,
   groups,
@@ -62,6 +66,7 @@ import {
 } from '../tokenomics/flywheel';
 import {
   BURN_EXPLORER_URL,
+  HARBOR_VAULT_CONTRACT_ADDRESS,
   ROBINHOOD_CHAIN_ID,
   ROBINHOOD_CHAIN_NAME,
   ROBINHOOD_MAINNET_CHAIN_ID,
@@ -73,10 +78,14 @@ import {
   WORLD_IS_FLAT_FAIR_URL,
   WORLD_IS_FLAT_URL,
   WalletAdapter,
+  buildMetaMaskMobileDeepLink,
   detectEip1193WalletSource,
+  discoverEip6963Wallets,
   fetchLiveOnChainWifProof,
   fetchOpenMultiplayerRooms,
   fetchWalletRegistrySummary,
+  hasInjectedWeb3Provider,
+  isMobileBrowserWithoutWallet,
   reportCompletedMatch,
   reportWalletConnected,
   submitOnChainTxVerification,
@@ -308,6 +317,8 @@ export function mountRobinTown(): void {
   } | null = null;
   let applyingRemoteTownSync = false;
   const claimedConnectBonusWallets = new Set<string>();
+  let challengeTargetWif: number | null = null;
+  let challengeSeedOverride: string | null = null;
 
   // Fast-Time A-to-Z Auto-Play & Live AI Neighbor Feed
   type FastPlaySpeed = 0 | 1 | 3 | 8;
@@ -612,7 +623,22 @@ export function mountRobinTown(): void {
       await syncConnectedWeb3Wallet(acc.address, ROBINHOOD_MAINNET_CHAIN_ID);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Wallet connection declined.';
-      toast(msg);
+      if (isMobileBrowserWithoutWallet()) {
+        const deepLink = buildMetaMaskMobileDeepLink();
+        modal(
+          'Open Robin Town in MetaMask Mobile',
+          `<div class="wif-hub-section">
+            <p>Mobile Safari and Chrome do not inject browser wallet extensions directly. Tap below to open this exact table inside the <strong>MetaMask Mobile</strong> in-app browser on <strong>Robinhood Chain (4663)</strong>, or play Casual Town free right here.</p>
+            <div class="modal-actions">
+              <a class="primary" href="${escape(deepLink)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">🦊 Open in MetaMask App ↗</a>
+              <button type="button" class="secondary" data-action="close">Play Free Casual Town</button>
+            </div>
+          </div>`,
+          'MOBILE WEB3 HANDOFF · CHAIN 4663',
+        );
+      } else {
+        toast(msg);
+      }
     } finally {
       walletFlowState = 'idle';
       if (menuOpen) renderStartMenu();
@@ -909,6 +935,18 @@ export function mountRobinTown(): void {
           trading.resolveExternalTradeResult?.(accepted, responderName, taxAmount);
           if (accepted && taxAmount > 0) recordTradeTaxToVault(taxAmount, 1);
         }
+        return;
+      }
+
+      if (rawType === 'TOWN_CHAT_PING') {
+        const senderName = String(payload.senderName || 'Neighbor').slice(0, 24);
+        const pingText = String(payload.text || '').slice(0, 64);
+        if (pingText) {
+          liveBotFeed = `Room ${code} · ${senderName}: ${pingText}`;
+          playSound('tap');
+          toast(`${senderName}: ${pingText}`);
+          render();
+        }
       }
     });
     const unsubStatus = room.transport.onStatusChange(() => {
@@ -1099,8 +1137,9 @@ export function mountRobinTown(): void {
 
   function calendar() {
     const z = ZODIAC[state.year - 1],
-      label = `Year ${state.year}/6 · ${z[0]}`;
-    return `<aside class="calendar paper-calendar" aria-label="Robin-Town year calendar"><div class="calendar-sheet"><button class="calendar-date" data-action="years" aria-label="${label}. View all six years"><span class="calendar-heading">ROBIN TOWN</span><small class="calendar-caption">YEAR</small><strong class="calendar-digit">${state.year}</strong><span class="calendar-animal">${zodiacSprite(state.year - 1)}<b>${z[0]}</b></span><span class="calendar-footnote">${state.year} / 6 · View years</span></button></div></aside>`;
+      yrEvent = getYearMarketEvent(state),
+      label = `Year ${state.year}/6 · ${z[0]} · ${yrEvent.title} (${yrEvent.shortTag})`;
+    return `<aside class="calendar paper-calendar" aria-label="Robin-Town year calendar"><div class="calendar-sheet"><button class="calendar-date" data-action="years" title="${escape(label)}" aria-label="${escape(label)}. View all six years"><span class="calendar-heading">ROBIN TOWN</span><small class="calendar-caption">YEAR</small><strong class="calendar-digit">${state.year}</strong><span class="calendar-animal">${zodiacSprite(state.year - 1)}<b>${z[0]}</b></span><span class="calendar-footnote">${yrEvent.icon} ${state.year} / 6</span></button></div></aside>`;
   }
 
   function playerCard() {
@@ -1153,6 +1192,11 @@ export function mountRobinTown(): void {
         <span class="traders-hud-count">${myRank ? `#${myRank}` : totalWallets.toLocaleString('en-US')}</span>
         <span class="traders-hud-label">${myRank ? `· ${totalWallets}` : totalWallets === 1 ? 'Wallet' : 'Wallets'}</span>
       </button>
+      ${
+        activeRoomCode
+          ? `<button type="button" class="room-hud-pill" data-action="copy-room-link" title="Online Room ${escape(activeRoomCode)} active. Click to copy invite link" aria-label="Copy Online Room ${escape(activeRoomCode)} invite link">🟢 ${escape(activeRoomCode)} 📋</button>`
+          : ''
+      }
       <button class="wif-hud-pill" data-action="wif-hub" aria-label="Open $wif Flywheel, Wallet, and Rooms">
         <span class="wif-hud-burn">🔥 ${flywheel.totalBurned.toLocaleString('en-US')}</span>
         <span class="wif-hud-mobile-icon" aria-hidden="true">💰</span>
@@ -1731,7 +1775,14 @@ export function mountRobinTown(): void {
         autoPlaySpeed > 0
           ? `<span class="bot-feed-speed">⚡ ${autoPlaySpeed}x</span>`
           : `<span class="bot-feed-tag">LIVE TABLE</span>`;
-      botFeedEl.innerHTML = `${botDots}${speedBadge}<span class="bot-feed-text">${escape(liveBotFeed)}</span>`;
+      const yrEvt = getYearMarketEvent(state);
+      const evtBadge = `<button type="button" class="zodiac-feed-pill" data-action="year-info" data-year="${state.year}" title="${escape(yrEvt.title)}: ${escape(yrEvt.summary)}">${yrEvt.icon} ${escape(yrEvt.shortTag)}</button>`;
+      const myCashNow = state.players[0]?.cash ?? 0;
+      const targetBadge =
+        challengeTargetWif !== null
+          ? `<span class="challenge-target-badge ${myCashNow > challengeTargetWif ? 'beaten' : ''}">🎯 ${myCashNow > challengeTargetWif ? `Beat ${challengeTargetWif.toLocaleString('en-US')} ✓` : `Target ${challengeTargetWif.toLocaleString('en-US')} $wif`}</span>`
+          : '';
+      botFeedEl.innerHTML = `${botDots}${speedBadge}${evtBadge}${targetBadge}<span class="bot-feed-text">${escape(liveBotFeed)}</span>`;
       botFeedEl.classList.toggle('fast-active', autoPlaySpeed > 0);
     }
     get('.camera-hint').textContent =
@@ -1826,15 +1877,22 @@ export function mountRobinTown(): void {
   }
 
   function buildShowcaseCarouselItems(): CarouselItem[] {
-    const districtCards: CarouselItem[] = DISTRICTS.map((name, idx) => ({
-      id: idx + 1,
-      title: `${name} District`,
-      district: `BLOCK 0${idx + 1}`,
-      color: DISTRICT_ACCENTS[idx],
-      owner: `${state.lots.slice(idx * 12, idx * 12 + 12).filter((l) => l.owner !== null).length}/12 Claimed`,
-      shop: `${SHOPS[idx].name} (${SHOPS[idx].size} tiles)`,
-      income: COMPLETE[SHOPS[idx].size],
-    }));
+    const myMajorities = new Set(getPlayerDistrictMajorities(state, 0));
+    const districtCards: CarouselItem[] = DISTRICTS.map((name, idx) => {
+      const claimedCount = state.lots
+        .slice(idx * 12, idx * 12 + 12)
+        .filter((l) => l.owner !== null).length;
+      const hasMajority = myMajorities.has(idx);
+      return {
+        id: idx + 1,
+        title: `${name} District`,
+        district: hasMajority ? `🏛️ GUILD SEAL (+${DISTRICT_MAJORITY_BONUS})` : `BLOCK 0${idx + 1}`,
+        color: DISTRICT_ACCENTS[idx],
+        owner: `${claimedCount}/12 Claimed`,
+        shop: `${SHOPS[idx].name} (${SHOPS[idx].size} tiles)`,
+        income: COMPLETE[SHOPS[idx].size] + (hasMajority ? DISTRICT_MAJORITY_BONUS : 0),
+      };
+    });
     return [
       ...districtCards,
       {
@@ -1944,8 +2002,14 @@ export function mountRobinTown(): void {
             ${metaMaskStripHtml}
 
             <div class="start-actions">
-              ${progressActive ? `<span class="save-caption">Saved Match · Year ${state.year}/6 · ${phaseName()} · ${state.players[0].cash} $wif (${escape(savedModeLabel)})</span>` : ''}
-              <button class="primary start-play" data-action="resume" ${assetsReady ? '' : 'disabled'}>${progressActive ? 'Continue game' : selectedEntryMode === 'ranked' ? 'Enter 1,000 $wif Arena' : selectedEntryMode === 'daily' ? `Play Daily Seed (${walletStats?.todaySeed ?? getTodayHarborSeedKey()})` : 'Start free game'} <span>▶</span></button>
+              ${
+                challengeTargetWif !== null
+                  ? `<span class="save-caption challenge-banner-caption">🎯 Challenge Active: Beat ${challengeTargetWif.toLocaleString('en-US')} $wif${challengeSeedOverride ? ` on Daily Seed ${escape(challengeSeedOverride)}` : ''}</span>`
+                  : progressActive
+                    ? `<span class="save-caption">Saved Match · Year ${state.year}/6 · ${phaseName()} · ${state.players[0].cash} $wif (${escape(savedModeLabel)})</span>`
+                    : ''
+              }
+              <button class="primary start-play" data-action="resume" ${assetsReady ? '' : 'disabled'}>${progressActive ? 'Continue game' : selectedEntryMode === 'ranked' ? 'Enter 1,000 $wif Arena' : selectedEntryMode === 'daily' ? `Play Daily Seed (${challengeSeedOverride ?? walletStats?.todaySeed ?? getTodayHarborSeedKey()})` : 'Start free game'} <span>▶</span></button>
               <button class="menu-option fast-menu-cta" data-action="launch-fast-play" ${assetsReady ? '' : 'disabled'}>⚡ Fast Play A to Z (Watch You + Cole, Maya & Clara)</button>
               <div class="start-secondary-grid ${progressActive ? 'has-save' : 'fresh-save'}">
                 ${progressActive ? `<button class="menu-option" data-action="new">↻ New game</button>` : ''}
@@ -1975,7 +2039,9 @@ export function mountRobinTown(): void {
             <p class="start-foot">Inspired by Chinatown · 2D + 3D Tabletop + Three.js 3D Living City</p>
             <div class="start-foot-actions">
               ${progressActive ? `<button class="artbook-link" data-action="businesses">Shop ledger</button> · <button class="artbook-link" data-action="history">Town journal</button> · ` : ''}
-              <button class="artbook-link" data-action="research">Design notebook & Aseprite artbook</button>
+              <button class="artbook-link" data-action="research">Design notebook & Aseprite artbook</button> ·
+              <a class="artbook-link" href="/updates" target="_blank" rel="noopener">Ship log</a> ·
+              <a class="artbook-link" href="https://github.com/harrymove-ctrl/robin-town" target="_blank" rel="noopener">GitHub</a>
             </div>
           </div>
         </div>
@@ -2104,6 +2170,10 @@ export function mountRobinTown(): void {
     const wsActive = activeRoom?.isCloudRelayActive() ?? false;
     const patronActive = Boolean(walletStats?.me?.onChainPatronBoost);
     const verifiedTxCount = walletStats?.me?.verifiedTxCount ?? 0;
+    const eip6963Wallets = discoverEip6963Wallets();
+    const selectedRdns = wallet.getSelectedProviderRdns();
+    const hasProvider = hasInjectedWeb3Provider();
+    const vaultReady = Boolean(HARBOR_VAULT_CONTRACT_ADDRESS);
 
     modal(
       '$wif Flywheel, Wallet & Online Rooms',
@@ -2117,13 +2187,26 @@ export function mountRobinTown(): void {
       <div class="wif-hub-sections-grid">
       <section class="wif-hub-section wif-hub-span-full">
         <h3>1. Official World is Flat ($wif) Wallet · Robinhood Chain Mainnet (${ROBINHOOD_MAINNET_CHAIN_ID})</h3>
-        <p>Play immediately with pre-funded accounts (0 $wif required to enter) or connect MetaMask / Rabby on <strong>Robinhood Chain Mainnet (${ROBINHOOD_MAINNET_CHAIN_ID})</strong> with official <strong>World is Flat</strong> ERC-20 <code>$wif</code> (<a href="${WIF_BLOCKSCOUT_TOKEN_URL}" target="_blank" rel="noopener"><code>${WIF_TOKEN_CONTRACT_ADDRESS.slice(0, 8)}…${WIF_TOKEN_CONTRACT_ADDRESS.slice(-4)}</code></a>).</p>
+        <p>Play immediately with pre-funded accounts (0 $wif required to enter) or connect MetaMask, Rabby, Coinbase, or any EIP-6963 wallet on <strong>Robinhood Chain Mainnet (${ROBINHOOD_MAINNET_CHAIN_ID})</strong> with official <strong>World is Flat</strong> ERC-20 <code>$wif</code> (<a href="${WIF_BLOCKSCOUT_TOKEN_URL}" target="_blank" rel="noopener"><code>${WIF_TOKEN_CONTRACT_ADDRESS.slice(0, 8)}…${WIF_TOKEN_CONTRACT_ADDRESS.slice(-4)}</code></a>).</p>
         <div class="wif-row-actions" style="margin-bottom:8px">
           <a class="robin-chain-pill" href="${WORLD_IS_FLAT_URL}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">🌐 worldisflat.fun</a>
           <a class="robin-chain-pill" href="${WORLD_IS_FLAT_BUILD_URL}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">🗳️ Vote with $wif (/build)</a>
           <a class="robin-chain-pill" href="${WORLD_IS_FLAT_FAIR_URL}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">⚖️ World is Fair (/fair)</a>
           <a class="robin-chain-pill" href="${WIF_PONS_LAUNCHPAD_URL}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">💱 Trade $wif on Pons</a>
         </div>
+        ${
+          eip6963Wallets.length > 0
+            ? `<div class="wif-row-actions eip6963-wallet-row" style="margin-bottom:8px" aria-label="Detected EIP-6963 browser wallets">
+                <span class="muted" style="font-size:11.5px;font-weight:700">Detected Wallets:</span>
+                ${eip6963Wallets
+                  .map(
+                    (item) =>
+                      `<button type="button" class="eip6963-wallet-pill ${selectedRdns === (item.info.rdns || item.info.name) ? 'active' : ''}" data-action="select-eip6963-wallet" data-rdns="${escape(item.info.rdns || item.info.uuid || item.info.name)}">🔌 ${escape(item.info.name)}</button>`,
+                  )
+                  .join('')}
+              </div>`
+            : ''
+        }
         <div class="wif-row-actions" style="margin-bottom:8px">
           ${simAccounts
             .map(
@@ -2134,6 +2217,7 @@ export function mountRobinTown(): void {
         </div>
         <div class="wif-row-actions">
           <button type="button" class="primary" data-action="connect-mainnet-wif">${wState.mode === 'web3' && wState.status === 'connected' && wState.chainId === ROBINHOOD_MAINNET_CHAIN_ID ? `Mainnet 4663: ${activeAddr.slice(0, 8)}…` : 'Connect Robinhood Chain (4663)'}</button>
+          ${!hasProvider ? `<a class="secondary" href="${escape(buildMetaMaskMobileDeepLink())}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">🦊 Open in MetaMask App ↗</a>` : `<button type="button" class="secondary" data-action="watch-wif-asset">➕ Add $wif to Wallet</button>`}
           ${currentRealWeb3Address() && !isCurrentWalletVerified() ? `<button type="button" class="secondary" data-action="verify-wallet-sig">✍️ Verify Ownership (+100 pts, 0 gas)</button>` : ''}
           <button type="button" class="secondary" data-action="burn-mainnet-wif" data-amount="0.1">🔥 Burn 0.1 $wif</button>
           <button type="button" class="secondary" data-action="burn-mainnet-wif" data-amount="1">🔥 Burn 1 $wif (+150 pts)</button>
@@ -2166,6 +2250,12 @@ export function mountRobinTown(): void {
         <p>Lock 500 $wif in the neighborhood Staking Vault (or verify >= 1 $wif moved on Robinhood Chain 4663) to multiply all your annual storefront paydays by <strong>1.20x</strong>.</p>
         <div class="wif-row-actions">
           <button type="button" class="primary" data-action="toggle-stake">${stakedWif >= 500 ? 'Unstake 500 $wif (Active 1.20x)' : 'Stake 500 $wif -> Activate 1.20x Boost'}</button>
+          ${
+            vaultReady && currentRealWeb3Address()
+              ? `<button type="button" class="secondary" data-action="stake-mainnet-vault">⛓️ Vault Stake 500 $wif</button>
+                 <button type="button" class="secondary" data-action="unstake-mainnet-vault">⛓️ Vault Unstake</button>`
+              : ''
+          }
           <span class="muted" style="font-size:12px">${patronActive ? '⛓️ 1.20x On-Chain Patron Boost permanently active!' : isStaked() ? 'Staked: 500 $wif earning boosted street yield' : 'Currently unstaked (1.00x base yield)'}</span>
         </div>
       </section>
@@ -2217,6 +2307,12 @@ export function mountRobinTown(): void {
                     ? `<button type="button" class="primary" data-action="start-online-room">Launch Online Table ▶</button>`
                     : `<button type="button" class="secondary" data-action="toggle-room-ready">${activeRoom?.getLocalPlayer()?.isReady ? 'Ready ✓' : 'Mark Ready'}</button>`
                 }
+              </div>
+              <div class="deal-ping-row" aria-label="Quick tabletop deal pings">
+                <button type="button" class="secondary" data-action="send-room-ping" data-ping="👋 Open to deals!">👋 Open to deals!</button>
+                <button type="button" class="secondary" data-action="send-room-ping" data-ping="☕ Need shop tiles">☕ Need shop tiles</button>
+                <button type="button" class="secondary" data-action="send-room-ping" data-ping="📐 Trading corners">📐 Trading corners</button>
+                <button type="button" class="secondary" data-action="send-room-ping" data-ping="🤝 Nice deal!">🤝 Nice deal!</button>
               </div>`
             : ''
         }
@@ -2424,7 +2520,10 @@ export function mountRobinTown(): void {
   function yearBook() {
     modal(
       'Six Zodiac Years in Robin-Town',
-      `<div class="year-list">${ZODIAC.map((z, i) => `<button class="${i + 1 === state.year ? 'current' : ''}" data-action="year-info" data-year="${i + 1}">${zodiacSprite(i)}<span>Year ${i + 1} · ${z[0]}</span><span>${i + 1 === state.year ? 'Now' : i + 1 < state.year ? '✓' : ''}</span></button>`).join('')}</div>`,
+      `<div class="year-list">${ZODIAC.map((z, i) => {
+        const evt = getYearMarketEvent(state, i + 1);
+        return `<button class="${i + 1 === state.year ? 'current' : ''}" data-action="year-info" data-year="${i + 1}">${zodiacSprite(i)}<span>Year ${i + 1} · ${z[0]}<small style="display:block;font-size:11px;opacity:0.85">${evt.icon} ${escape(evt.title)}: ${escape(evt.shortTag)}</small></span><span>${i + 1 === state.year ? 'Now' : i + 1 < state.year ? '✓' : ''}</span></button>`;
+      }).join('')}</div>`,
       'THE ROBIN-TOWN CALENDAR',
     );
   }
@@ -2461,8 +2560,9 @@ export function mountRobinTown(): void {
       ended:
         'The sixth payday is complete! Open the final standings to settle your $wif rewards.',
     };
+    const yrEvt = getYearMarketEvent(state);
     get('#phase-cue').innerHTML =
-      `<section class="phase-announcement"><button data-action="dismiss-phase" class="close" aria-label="Dismiss guide">×</button><small>YEAR ${state.year} · ${ZODIAC[state.year - 1][0]}</small><h2>${phaseName()}</h2><p>${descriptions[state.phase]}</p>${state.phase === 'receive' ? `<div class="deal-reels">${state.pending.map((id, i) => `<span style="--deal-delay:${i * 90}ms"><b>${id + 1}</b></span>`).join('')}</div>` : state.phase === 'build' ? `<div class="cue-sprites">${sprite('shops', 'coffee')}${sprite('shops', 'banhmi')}${sprite('shops', 'pho')}</div>` : state.phase === 'trade' ? `<div class="cue-tokens">${token(0)}<b>⇄</b>${token(1)}</div>` : ''}<button class="primary" data-action="dismiss-phase">Let us go →</button><div class="cue-countdown"></div></section>`;
+      `<section class="phase-announcement"><button data-action="dismiss-phase" class="close" aria-label="Dismiss guide">×</button><small>YEAR ${state.year} · ${ZODIAC[state.year - 1][0]}</small><h2>${phaseName()}</h2><p>${descriptions[state.phase]}</p><div class="zodiac-event-pill">${yrEvt.icon} ${escape(yrEvt.title)}: ${escape(yrEvt.shortTag)}</div>${state.phase === 'receive' ? `<div class="deal-reels">${state.pending.map((id, i) => `<span style="--deal-delay:${i * 90}ms"><b>${id + 1}</b></span>`).join('')}</div>` : state.phase === 'build' ? `<div class="cue-sprites">${sprite('shops', 'coffee')}${sprite('shops', 'banhmi')}${sprite('shops', 'pho')}</div>` : state.phase === 'trade' ? `<div class="cue-tokens">${token(0)}<b>⇄</b>${token(1)}</div>` : ''}<button class="primary" data-action="dismiss-phase">Let us go →</button><div class="cue-countdown"></div></section>`;
     get('#phase-cue').classList.add('show');
     playSound('phase');
     phaseTimer = setTimeout(dismissPhase, manual ? 6500 : 2600);
@@ -2655,10 +2755,41 @@ export function mountRobinTown(): void {
           );
           anim.onfinish = () => pop.remove();
         });
+      if (state.year === 6) {
+        const fireworkPalette = ['#eec353', '#8bf5b5', '#39a883', '#ff8c66', '#7fb5cf'];
+        const vw = window.innerWidth || 1000;
+        const vh = window.innerHeight || 700;
+        for (let b = 0; b < 4; b++) {
+          const cx = Math.round(vw * (0.24 + b * 0.17));
+          const cy = Math.round(vh * (0.2 + (b % 2) * 0.1));
+          for (let s = 0; s < 10; s++) {
+            const angle = (Math.PI * 2 * s) / 10;
+            const dist = 65 + (s % 2) * 28;
+            const dx = Math.round(Math.cos(angle) * dist);
+            const dy = Math.round(Math.sin(angle) * dist);
+            const spark = document.createElement('span');
+            spark.className = 'harbor-firework-spark';
+            spark.style.left = `${cx}px`;
+            spark.style.top = `${cy}px`;
+            spark.style.background = fireworkPalette[(b + s) % fireworkPalette.length];
+            fx.append(spark);
+            const sparkAnim = spark.animate(
+              [
+                { transform: 'translate(-50%, -50%) scale(0.4)', opacity: 1 },
+                { offset: 0.7, transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1.15)`, opacity: 0.95 },
+                { transform: `translate(calc(-50% + ${Math.round(dx * 1.2)}px), calc(-50% + ${Math.round(dy * 1.2 + 18)}px)) scale(0.2)`, opacity: 0 },
+              ],
+              { duration: 1550, delay: b * 240, easing: 'cubic-bezier(.16,.84,.32,1)', fill: 'both' },
+            );
+            sparkAnim.onfinish = () => spark.remove();
+          }
+        }
+      }
     }
+    const yrEvt = getYearMarketEvent(state);
     const banner = document.createElement('div');
     banner.className = 'payday-banner';
-    banner.innerHTML = `<small>YEAR-END $WIF PAYDAY</small><strong>+${state.lastIncome[0]} $wif</strong><span>${isStaked() ? '1.20x $wif Staking Boost applied!' : 'Your storefronts are paying off'}</span>`;
+    banner.innerHTML = `<small>${state.year === 6 ? '★ FINAL YEAR 6 HARBOR PAYDAY ★' : 'YEAR-END $WIF PAYDAY'}</small><strong>+${state.lastIncome[0]} $wif</strong><span>${isStaked() ? `1.20x Staking Boost · ${yrEvt.icon} ${escape(yrEvt.title)}` : `${yrEvt.icon} ${escape(yrEvt.title)} · Storefronts paid out`}</span>`;
     fx.append(banner);
     setTimeout(() => banner.remove(), 3200);
   }
@@ -2704,9 +2835,11 @@ export function mountRobinTown(): void {
   }
 
   function incomeModal() {
+    const yrEvt = getYearMarketEvent(state);
+    const myBd = incomeBreakdown(state, 0, isStaked());
     modal(
       'This year $wif earnings.',
-      `<p>Every business in the neighborhood has paid its owner.</p>${state.players.map((p, i) => `<div class="score-row">${token(i)}<span>${i === 0 ? 'You' : escape(p.name)}</span><strong>+${money(state.lastIncome[i] ?? 0)}</strong><span class="muted">Total ${p.cash} $wif</span></div>`).join('')}<div class="modal-actions"><button class="primary" data-action="${state.phase === 'ended' ? 'results' : 'next'}">${state.phase === 'ended' ? 'Final standings' : 'Begin year ' + (state.year + 1)} →</button></div>`,
+      `<p>Every business in the neighborhood has paid its owner (${yrEvt.icon} <strong>${escape(yrEvt.title)}</strong>: ${escape(yrEvt.shortTag)}).</p><p class="muted" style="font-size:12px;margin-top:-4px">Your Breakdown: Storefronts +${myBd.shopBase} $wif · Zodiac Event +${myBd.zodiacBonus} $wif · Guild Majorities +${myBd.districtBonus} $wif${isStaked() ? ' · 1.20x Staked Boost' : ''}.</p>${state.players.map((p, i) => `<div class="score-row">${token(i)}<span>${i === 0 ? 'You' : escape(p.name)}</span><strong>+${money(state.lastIncome[i] ?? 0)}</strong><span class="muted">Total ${p.cash} $wif</span></div>`).join('')}<div class="modal-actions"><button class="primary" data-action="${state.phase === 'ended' ? 'results' : 'next'}">${state.phase === 'ended' ? 'Final standings' : 'Begin year ' + (state.year + 1)} →</button></div>`,
       phaseName('income'),
     );
   }
@@ -2844,10 +2977,17 @@ export function mountRobinTown(): void {
       spread = all.slice(start, start + 6),
       left = spread.slice(0, 3),
       right = spread.slice(3),
-      total = income(state, 0, isStaked());
+      bd = incomeBreakdown(state, 0, isStaked()),
+      total = bd.total,
+      majorities = getPlayerDistrictMajorities(state, 0),
+      yrEvt = getYearMarketEvent(state);
+    const majorityLine =
+      majorities.length > 0
+        ? `🏛️ Guild Majority Seals: ${majorities.map((d) => DISTRICTS[d]).join(', ')} (+${bd.districtBonus} $wif/yr)`
+        : 'Claim 6+ plots in any district to earn its +15 $wif/yr Guild Majority Seal.';
     modal(
       'Your shop ledger',
-      `<div class="ledger-binding"><span class="book-ribbon" aria-hidden="true"></span><div class="book-spread"><section class="book-page left-page"><div class="page-heading"><span>ROBIN TOWN</span><span>YEAR ${state.year}</span></div>${ledgerPage === 0 ? `<div class="ledger-book-title"><small>THE NEIGHBORHOOD ACCOUNTS</small><h2>Your shop ledger</h2><p>Storefronts, street addresses & annual $wif yield</p></div>` : `<h2 class="ledger-continuation">The accounts continue…</h2>`}${left.map((g, i) => shopEntry(g, start + i)).join('') || `<div class="empty-ledger">${sprite('shops', 'coffee')}<h3>A blank page. A new beginning.</h3><p>Open a shop on one of your plots. Its street address and annual $wif income will be recorded here.</p></div>`}<span class="page-number">${ledgerPage * 2 + 1}</span></section><section class="book-page right-page"><div class="page-heading"><span>BUSINESS INCOME</span><span>Ledger 01</span></div>${right.map((g, i) => shopEntry(g, start + 3 + i)).join('')}${right.length < 3 ? `<div class="book-margin-note"><strong>A note for tomorrow</strong><p>Matching shops of your stool color must share an edge inside the same district block. Roads and diagonal corners do not connect.</p><p>Stake 500 $wif in the Hub to multiply all annual shop payouts by 1.20x.</p></div>` : ''}<div class="ledger-tally"><span>ALL YOUR SHOPS · EACH YEAR${isStaked() ? ' (1.20X STAKED)' : ''}</span><strong>${total}<small> $wif</small></strong><div>${all.length} business groups · ${holdings(state, 0).filter((l) => l.shop !== null).length} placed pieces</div></div><div class="ledger-signature">Recorded on Robinhood Chain</div><span class="page-number">${ledgerPage * 2 + 2}</span></section></div></div><nav class="book-navigation" aria-label="Ledger pages"><button data-action="ledger-prev" class="book-tab" ${ledgerPage === 0 ? 'disabled' : ''}>← Previous</button><span>${ledgerPage + 1} / ${count}</span><button data-action="ledger-next" class="book-tab" ${ledgerPage === count - 1 ? 'disabled' : ''}>Next →</button></nav>`,
+      `<div class="ledger-binding"><span class="book-ribbon" aria-hidden="true"></span><div class="book-spread"><section class="book-page left-page"><div class="page-heading"><span>ROBIN TOWN</span><span>YEAR ${state.year}</span></div>${ledgerPage === 0 ? `<div class="ledger-book-title"><small>THE NEIGHBORHOOD ACCOUNTS</small><h2>Your shop ledger</h2><p>Storefronts, street addresses & annual $wif yield</p></div>` : `<h2 class="ledger-continuation">The accounts continue…</h2>`}${left.map((g, i) => shopEntry(g, start + i)).join('') || `<div class="empty-ledger">${sprite('shops', 'coffee')}<h3>A blank page. A new beginning.</h3><p>Open a shop on one of your plots. Its street address and annual $wif income will be recorded here.</p></div>`}<span class="page-number">${ledgerPage * 2 + 1}</span></section><section class="book-page right-page"><div class="page-heading"><span>BUSINESS INCOME</span><span>Ledger 01</span></div>${right.map((g, i) => shopEntry(g, start + 3 + i)).join('')}${right.length < 3 ? `<div class="book-margin-note"><strong>${yrEvt.icon} ${escape(yrEvt.title)}</strong><p>${escape(yrEvt.summary)}</p><p>${escape(majorityLine)}</p></div>` : ''}<div class="ledger-tally"><span>ALL YOUR SHOPS · EACH YEAR${isStaked() ? ' (1.20X STAKED)' : ''}</span><strong>${total}<small> $wif</small></strong><div>${all.length} business groups · +${bd.zodiacBonus} Zodiac · +${bd.districtBonus} Guild Seal</div></div><div class="ledger-signature">Recorded on Robinhood Chain</div><span class="page-number">${ledgerPage * 2 + 2}</span></section></div></div><nav class="book-navigation" aria-label="Ledger pages"><button data-action="ledger-prev" class="book-tab" ${ledgerPage === 0 ? 'disabled' : ''}>← Previous</button><span>${ledgerPage + 1} / ${count}</span><button data-action="ledger-next" class="book-tab" ${ledgerPage === count - 1 ? 'disabled' : ''}>Next →</button></nav>`,
       'THE SHOPKEEPER LEDGER',
     );
     get('#modal').classList.add('ledger-dialog');
@@ -2865,7 +3005,10 @@ export function mountRobinTown(): void {
       }
       toast('1,000 $wif buy-in locked! 4,000 $wif Ranked Arena pot is live.');
     }
-    const seedKey = selectedEntryMode === 'daily' ? getTodayHarborSeedKey() : undefined;
+    const seedKey =
+      selectedEntryMode === 'daily'
+        ? challengeSeedOverride || getTodayHarborSeedKey()
+        : undefined;
     if (selectedEntryMode === 'daily' && seedKey) {
       toast(`📅 Daily Harbor Seed ${seedKey} loaded! Same 6-year draws for every trader today.`);
     }
@@ -3067,6 +3210,75 @@ export function mountRobinTown(): void {
       case 'connect-mainnet-wif':
         void connectMetaMaskQuick();
         break;
+      case 'select-eip6963-wallet': {
+        const rdns = (data.rdns || '').trim();
+        if (rdns && wallet.selectEip6963Provider(rdns)) {
+          toast(`Selected wallet provider: ${rdns}. Connecting to Robinhood Chain (4663)…`);
+          void connectMetaMaskQuick();
+        }
+        break;
+      }
+      case 'watch-wif-asset': {
+        void wallet
+          .watchMainnetWifAsset()
+          .then((added) => {
+            toast(
+              added
+                ? '✓ Added World is Flat ($wif) token to your wallet!'
+                : 'Token watch prompt closed.',
+            );
+          })
+          .catch((err: unknown) => {
+            toast(err instanceof Error ? err.message : 'Connect a Web3 wallet first.');
+          });
+        break;
+      }
+      case 'stake-mainnet-vault': {
+        void wallet
+          .stakeMainnetVaultWif(500)
+          .then((tx) => {
+            lastMainnetTxHash = tx.hash;
+            stakedWif = Math.max(500, stakedWif);
+            saveEconomy();
+            toast('⛓️ Staked 500 $wif in RobinTownHarborVault! 1.20x Payday Boost active.');
+            if (get('#modal').dataset.wifHub === 'true') openWifHub();
+            render();
+          })
+          .catch((err: unknown) => {
+            toast(err instanceof Error ? err.message : 'Vault stake transaction cancelled.');
+          });
+        break;
+      }
+      case 'unstake-mainnet-vault': {
+        void wallet
+          .unstakeMainnetVaultWif(500)
+          .then((tx) => {
+            lastMainnetTxHash = tx.hash;
+            stakedWif = 0;
+            saveEconomy();
+            toast('⛓️ Unstaked 500 $wif from RobinTownHarborVault.');
+            if (get('#modal').dataset.wifHub === 'true') openWifHub();
+            render();
+          })
+          .catch((err: unknown) => {
+            toast(err instanceof Error ? err.message : 'Vault unstake transaction cancelled.');
+          });
+        break;
+      }
+      case 'send-room-ping': {
+        const pingText = (data.ping || '').trim();
+        if (!pingText || !activeRoom || !activeRoomCode) break;
+        const senderName = activeRoom.getLocalPlayer()?.name || 'You';
+        sendCustomRoomPacket('TOWN_CHAT_PING', {
+          senderName,
+          text: pingText,
+        });
+        liveBotFeed = `Room ${activeRoomCode} · You: ${pingText}`;
+        playSound('tap');
+        toast(`Sent to Room ${activeRoomCode}: ${pingText}`);
+        render();
+        break;
+      }
       case 'burn-mainnet-wif': {
         const burnAmt = Math.max(0.01, Number(data.amount || '0.1'));
         void wallet
@@ -3426,12 +3638,13 @@ export function mountRobinTown(): void {
         yearBook();
         break;
       case 'year-info': {
-        const y = Number(data.year),
-          z = ZODIAC[y - 1];
+        const y = Math.max(1, Math.min(6, Number(data.year) || state.year)),
+          z = ZODIAC[y - 1],
+          evt = getYearMarketEvent(state, y);
         modal(
           `Year ${y} · ${z[0]}`,
-          `<div class="zodiac-detail">${zodiacSprite(y - 1)}<p>The year of the ${z[1].toLowerCase()}.</p></div><p>${y === state.year ? 'Your current neighborhood year.' : y < state.year ? 'This year is complete.' : 'Finish the current year to turn the next calendar page.'}</p><div class="year-rewards"><strong>${KEEP[y - 1]} <small>new plots</small></strong><span>+</span><strong>${y === 1 ? 5 : 4} <small>shop pieces</small></strong></div><p class="rules-note">Six successive zodiac animals from Snake through Dog.</p>`,
-          'ZODIAC YEAR CYCLE',
+          `<div class="zodiac-detail">${zodiacSprite(y - 1)}<p>The year of the ${z[1].toLowerCase()}.</p></div><div class="zodiac-event-pill" style="margin:8px 0">${evt.icon} <strong>${escape(evt.title)}</strong> · ${escape(evt.shortTag)}</div><p>${escape(evt.summary)}</p><p class="muted" style="font-size:12px">${y === state.year ? 'Active right now on your neighborhood board.' : y < state.year ? 'This zodiac year is complete.' : 'Finish the current year to turn the next calendar page.'}</p><div class="year-rewards"><strong>${KEEP[y - 1]} <small>new plots</small></strong><span>+</span><strong>${y === 1 ? 5 : 4} <small>shop pieces</small></strong></div>`,
+          'ZODIAC YEAR & HARBOR MARKET EVENT',
         );
         break;
       }
@@ -3696,6 +3909,7 @@ export function mountRobinTown(): void {
     'music',
     'toggle-ipod',
     'dismiss-phase',
+    'copy-room-link',
   ]);
 
   function preserveControlFocus(el: HTMLElement) {
@@ -4215,9 +4429,24 @@ export function mountRobinTown(): void {
     }
   });
 
-  // Auto-join cross-device online room if URL contains ?room=CODE6X
+  // Auto-join cross-device online room or pre-load Daily Seed / Beat-My-Score challenge from URL
   try {
-    const urlRoom = normalizeRoomCode(new URLSearchParams(window.location.search).get('room') ?? '');
+    const searchParams = new URLSearchParams(window.location.search);
+    const urlDaily = (searchParams.get('daily') ?? '').trim();
+    const rawTarget = Number(searchParams.get('target') ?? '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(urlDaily)) {
+      challengeSeedOverride = urlDaily;
+      selectedEntryMode = 'daily';
+    }
+    if (Number.isFinite(rawTarget) && rawTarget > 0 && rawTarget <= 250_000) {
+      challengeTargetWif = Math.round(rawTarget);
+    }
+    if (challengeSeedOverride || challengeTargetWif !== null) {
+      if (menuOpen) renderStartMenu();
+      else render();
+    }
+
+    const urlRoom = normalizeRoomCode(searchParams.get('room') ?? '');
     if (isValidRoomCode(urlRoom)) {
       const wAcc = wallet.getState().account;
       const room = new NetworkRoom({

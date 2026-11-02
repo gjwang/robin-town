@@ -1,5 +1,6 @@
 import { BOARD_REVISION, plotNeighbors } from './board-layout';
 import { calculateStakingBoost, calculateTradeTax } from '../tokenomics/flywheel';
+import { ZODIAC_MARKET_EVENTS, type ZodiacMarketEvent } from './zodiac';
 import type {
   GamePhase,
   GameState,
@@ -136,12 +137,109 @@ export function groupIncome(shop: number, count: number): number {
   return Math.floor(count / target) * COMPLETE[target] + INCOMPLETE[count % target];
 }
 
-export function income(state: GameState, player: number, isStaked = false): number {
-  const raw = groups(state, player).reduce(
+export const DISTRICT_MAJORITY_THRESHOLD = 6;
+export const DISTRICT_MAJORITY_BONUS = 15;
+
+export function getYearMarketEvent(
+  state: Pick<GameState, 'year' | 'dailySeed'>,
+  yearOverride?: number,
+): ZodiacMarketEvent {
+  const yr = Math.max(1, Math.min(6, yearOverride ?? state.year ?? 1));
+  if (!state.dailySeed) {
+    return ZODIAC_MARKET_EVENTS[yr - 1] ?? ZODIAC_MARKET_EVENTS[0];
+  }
+  const order = [0, 1, 2, 3, 4, 5];
+  let seed = hashHarborSeed(`zodiac-events:${state.dailySeed}`);
+  for (let i = order.length - 1; i > 0; i--) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const j = seed % (i + 1);
+    const tmp = order[i];
+    order[i] = order[j];
+    order[j] = tmp;
+  }
+  return ZODIAC_MARKET_EVENTS[order[yr - 1]] ?? ZODIAC_MARKET_EVENTS[0];
+}
+
+export function getPlayerDistrictMajorities(state: GameState, player: number): number[] {
+  const majorities: number[] = [];
+  for (let d = 0; d < DISTRICTS.length; d++) {
+    let owned = 0;
+    const base = d * 12;
+    for (let i = base; i < base + 12; i++) {
+      if (state.lots[i]?.owner === player) owned += 1;
+    }
+    if (owned >= DISTRICT_MAJORITY_THRESHOLD) {
+      majorities.push(d);
+    }
+  }
+  return majorities;
+}
+
+export function districtMajorityBonus(state: GameState, player: number): number {
+  return getPlayerDistrictMajorities(state, player).length * DISTRICT_MAJORITY_BONUS;
+}
+
+export function zodiacEventBonus(
+  state: GameState,
+  player: number,
+  yearOverride?: number,
+): number {
+  const evt = getYearMarketEvent(state, yearOverride);
+  const playerGroups = groups(state, player);
+  switch (evt.id) {
+    case 'harbor-cargo':
+      return playerGroups.reduce((sum, g) => {
+        const block = Math.floor((g.lots[0] ?? 0) / 12);
+        return sum + (block === 2 || block === 4 ? 6 : 0);
+      }, 0);
+    case 'night-festival':
+      return playerGroups.reduce((sum, g) => sum + (g.shop === 0 || g.shop === 2 ? 6 : 0), 0);
+    case 'morning-bloom':
+      return playerGroups.reduce((sum, g) => sum + (g.shop === 1 || g.shop === 3 ? 6 : 0), 0);
+    case 'merchant-guild':
+      return playerGroups.reduce((sum, g) => sum + (g.shop === 4 || g.shop === 5 ? 8 : 0), 0);
+    case 'artisan-ribbon':
+      return playerGroups.reduce((sum, g) => {
+        const target = SHOPS[g.shop]?.size ?? 3;
+        return sum + Math.floor(g.size / target) * 12;
+      }, 0);
+    case 'port-prosperity':
+      return state.lots.reduce((sum, lot) => {
+        if (lot.owner !== player || lot.shop === null) return sum;
+        const block = Math.floor(lot.id / 12);
+        return sum + (block === 0 || block === 1 || block === 5 ? 4 : 0);
+      }, 0);
+    default:
+      return 0;
+  }
+}
+
+export interface IncomeBreakdown {
+  shopBase: number;
+  zodiacBonus: number;
+  districtBonus: number;
+  subtotal: number;
+  total: number;
+}
+
+export function incomeBreakdown(
+  state: GameState,
+  player: number,
+  isStaked = false,
+): IncomeBreakdown {
+  const shopBase = groups(state, player).reduce(
     (total, group) => total + groupIncome(group.shop, group.size),
     0,
   );
-  return player === 0 && isStaked ? calculateStakingBoost(raw, true) : raw;
+  const zodiacBonus = zodiacEventBonus(state, player);
+  const districtBonus = districtMajorityBonus(state, player);
+  const subtotal = shopBase + zodiacBonus + districtBonus;
+  const total = player === 0 && isStaked ? calculateStakingBoost(subtotal, true) : subtotal;
+  return { shopBase, zodiacBonus, districtBonus, subtotal, total };
+}
+
+export function income(state: GameState, player: number, isStaked = false): number {
+  return incomeBreakdown(state, player, isStaked).total;
 }
 
 export function holdings(state: GameState, player: number): Lot[] {
@@ -304,9 +402,10 @@ export function startYear(state: GameState, rng: RandomSource = Math.random): vo
     drawTiles(state, player, state.year === 1 ? 5 : 4);
   }
 
+  const evt = getYearMarketEvent(state);
   log(
     state,
-    `Year ${state.year}: new addresses and ${state.year === 1 ? 5 : 4} shop tiles arrived.`,
+    `Year ${state.year} (${evt.title}): new addresses and ${state.year === 1 ? 5 : 4} shop tiles arrived. ${evt.summary}`,
   );
 }
 
@@ -556,6 +655,129 @@ export function trade(state: GameState, offer: TradeOffer): TradeEvaluation {
     `Deal ${state.trades}: you and ${partner.name} traded ${plots} plots, ${tiles} tiles, and $wif${taxNote}.`,
   );
   return { ...result, taxAmount: totalTax };
+}
+
+export interface BotCounterOffer {
+  counterOffer: TradeOffer;
+  summary: string;
+  actionLabel: string;
+}
+
+export function proposeBotCounterOffer(
+  state: GameState,
+  offer: TradeOffer,
+): BotCounterOffer | null {
+  try {
+    const check = evaluateOffer(state, offer);
+    if (check.accepted || check.shortfall <= 0) return null;
+    const you = state.players[0];
+    const partner = state.players[offer.partner];
+    if (!you || !partner) return null;
+
+    // 1. Check if adding 1 spare tile from player 0 that the bot wants closes the gap
+    for (let s = 0; s < SHOPS.length; s++) {
+      const avail = (you.tiles[s] ?? 0) - (offer.give.tiles[s] ?? 0);
+      if (avail <= 0) continue;
+      if (wantsTile(state, offer.partner, s) <= 0 && !isSurplusTileFor(state, 0, s)) continue;
+
+      const candidate: TradeOffer = JSON.parse(JSON.stringify(offer)) as TradeOffer;
+      candidate.give.tiles[s] = (candidate.give.tiles[s] ?? 0) + 1;
+      const recheck = evaluateOffer(state, candidate);
+      if (recheck.accepted) {
+        return {
+          counterOffer: candidate,
+          summary: `${partner.name} counters: Add 1× ${SHOPS[s].name} tile and we have a deal!`,
+          actionLabel: `+1 ${SHOPS[s].name} ✓`,
+        };
+      }
+      if (recheck.shortfall > 0 && recheck.shortfall <= 18 && candidate.give.cash + recheck.shortfall <= you.cash) {
+        candidate.give.cash += recheck.shortfall;
+        if (evaluateOffer(state, candidate).accepted) {
+          return {
+            counterOffer: candidate,
+            summary: `${partner.name} counters: Add 1× ${SHOPS[s].name} + ${recheck.shortfall} $wif and we shake hands!`,
+            actionLabel: `Load Counter ✓`,
+          };
+        }
+      }
+    }
+
+    // 2. Check if adding affordable $wif cash closes the shortfall
+    if (check.shortfall <= 65 && offer.give.cash + check.shortfall <= you.cash) {
+      const candidate: TradeOffer = JSON.parse(JSON.stringify(offer)) as TradeOffer;
+      candidate.give.cash += check.shortfall;
+      if (!evaluateOffer(state, candidate).accepted && candidate.give.cash + 1 <= you.cash) {
+        candidate.give.cash += 1;
+      }
+      if (evaluateOffer(state, candidate).accepted) {
+        const delta = candidate.give.cash - offer.give.cash;
+        return {
+          counterOffer: candidate,
+          summary: `${partner.name} counters: Top up +${delta} $wif (${candidate.give.cash} $wif total) and it is yours!`,
+          actionLabel: `+${delta} $wif Counter ✓`,
+        };
+      }
+    }
+
+    // 3. Check if trimming $wif requested from the neighbor closes the gap
+    if (offer.take.cash > 0 && offer.take.cash >= check.shortfall) {
+      const candidate: TradeOffer = JSON.parse(JSON.stringify(offer)) as TradeOffer;
+      candidate.take.cash = Math.max(0, offer.take.cash - check.shortfall);
+      if (evaluateOffer(state, candidate).accepted) {
+        return {
+          counterOffer: candidate,
+          summary: `${partner.name} counters: Lower your cash request to ${candidate.take.cash} $wif and we have a deal!`,
+          actionLabel: `Ask ${candidate.take.cash} $wif ✓`,
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function detectRivalMonopolyRisk(state: GameState, offer: TradeOffer): string | null {
+  const partner = state.players[offer.partner];
+  if (!partner) return null;
+
+  for (let s = 0; s < SHOPS.length; s++) {
+    const giving = offer.give.tiles[s] ?? 0;
+    if (giving <= 0) continue;
+    const targetSize = SHOPS[s].size;
+    const partnerLargestGroup = Math.max(
+      0,
+      ...groups(state, offer.partner)
+        .filter((g) => g.shop === s && g.size < targetSize)
+        .map((g) => g.size),
+    );
+    if (
+      partnerLargestGroup + giving >= targetSize ||
+      partnerLargestGroup + (partner.tiles[s] ?? 0) + giving >= targetSize
+    ) {
+      return `Monopoly Alert: Giving ${giving}× ${SHOPS[s].name} helps ${partner.name} complete a ${targetSize}/${targetSize} ${SHOPS[s].english} chain (${COMPLETE[targetSize]} $wif/yr)!`;
+    }
+  }
+
+  for (const lotId of offer.give.lots) {
+    const districtIdx = Math.floor(lotId / 12);
+    const partnerInDistrict = state.lots
+      .slice(districtIdx * 12, districtIdx * 12 + 12)
+      .filter((l) => l.owner === offer.partner).length;
+    const givenInDistrict = offer.give.lots.filter((id) => Math.floor(id / 12) === districtIdx).length;
+    if (
+      partnerInDistrict < DISTRICT_MAJORITY_THRESHOLD &&
+      partnerInDistrict + givenInDistrict >= DISTRICT_MAJORITY_THRESHOLD
+    ) {
+      return `Guild Seal Alert: Plot #${lotId + 1} hands ${partner.name} the ${DISTRICTS[districtIdx]} Majority Seal (+${DISTRICT_MAJORITY_BONUS} $wif/yr)!`;
+    }
+    const adjOwned = neighbors(lotId).filter((n) => state.lots[n]?.owner === offer.partner).length;
+    if (adjOwned >= 2) {
+      return `Cluster Alert: Plot #${lotId + 1} bridges ${adjOwned} adjacent ${partner.name} parcels into a multi-lot chain!`;
+    }
+  }
+
+  return null;
 }
 
 export interface BotTradeSummary {

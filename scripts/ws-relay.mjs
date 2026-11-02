@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { createWalletRegistry } from './wallet-registry.mjs';
+import { handleShipUpdatesRequest } from './ship-updates.mjs';
 
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const MAX_FRAME_BYTES = 262_144; // 256 KB cap per packet
@@ -149,6 +150,9 @@ export function createMultiplayerRelay(options = {}) {
   }
 
   function handleApiRequest(req, res) {
+    if (handleShipUpdatesRequest(req, res)) {
+      return true;
+    }
     const rawUrl = (req.url || '/').split('?')[0] || '/';
 
     if (rawUrl === '/api/rooms' && req.method === 'GET') {

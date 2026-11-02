@@ -4,6 +4,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { createMultiplayerRelay } from './ws-relay.mjs';
+import { PRODUCTION_ORIGIN, renderDynamicIndexHtml } from './ship-updates.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST_DIR = path.resolve(__dirname, '..', 'dist');
@@ -119,6 +120,21 @@ const server = http.createServer((req, res) => {
   }
 
   if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
+    if (safeRel === 'index.html' && (req.url || '').includes('?')) {
+      const baseHtml = fs.readFileSync(resolved, 'utf8');
+      const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+      const host = String(req.headers.host || '').trim();
+      const origin = host ? `${proto}://${host}` : PRODUCTION_ORIGIN;
+      const html = renderDynamicIndexHtml(baseHtml, req.url || '/', origin);
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      if (req.method === 'HEAD') res.end();
+      else res.end(html);
+      return;
+    }
     const isHashed = safeRel.startsWith('assets/') && /-[A-Za-z0-9_-]{6,}\./.test(safeRel);
     sendFile(req, res, resolved, isHashed);
     return;
@@ -132,6 +148,21 @@ const server = http.createServer((req, res) => {
 
   const indexHtml = path.join(DIST_DIR, 'index.html');
   if (fs.existsSync(indexHtml)) {
+    if ((req.url || '').includes('?')) {
+      const baseHtml = fs.readFileSync(indexHtml, 'utf8');
+      const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+      const host = String(req.headers.host || '').trim();
+      const origin = host ? `${proto}://${host}` : PRODUCTION_ORIGIN;
+      const html = renderDynamicIndexHtml(baseHtml, req.url || '/', origin);
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      if (req.method === 'HEAD') res.end();
+      else res.end(html);
+      return;
+    }
     sendFile(req, res, indexHtml, false);
     return;
   }
