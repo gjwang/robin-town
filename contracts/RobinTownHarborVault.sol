@@ -22,7 +22,9 @@ contract RobinTownHarborVault {
 
     string public constant PROJECT_WEBSITE = "https://robin-town-production.up.railway.app";
     string public constant PROJECT_GITHUB = "https://github.com/harrymove-ctrl/robin-town";
-    string public constant PROJECT_UPDATES = "https://robin-town-production.up.railway.app/updates";
+    string public constant PROJECT_UPDATES = "https://robin-town-production.up.railway.app/changelog";
+    string public constant PROJECT_DOCS = "https://robin-town-production.up.railway.app/docs";
+    string public constant PROJECT_FEED_RSS = "https://robin-town-production.up.railway.app/changelog.xml";
 
     address public constant OFFICIAL_WIF_MAINNET = 0x5173b8eA6923c2d40267890D45C46a3480954773;
     address public constant BURN_SINK = 0x000000000000000000000000000000000000dEaD;

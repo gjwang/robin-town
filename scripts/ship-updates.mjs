@@ -8,9 +8,12 @@ import {
   buildJsonFeedPayload,
   renderAtomFeedXml,
   renderDocsHtml,
+  renderLlmsTxt,
   renderPortalTopbarHtml,
+  renderRobotsTxt,
   renderRssFeedXml,
   renderSharedPortalCss,
+  renderSitemapXml,
 } from './game-docs.mjs';
 
 export const PRODUCTION_ORIGIN = 'https://robin-town-production.up.railway.app';
@@ -761,6 +764,50 @@ export function handleShipUpdatesRequest(req, res, vaultInfo = null) {
   const rawPath = ((req.url || '/').split('?')[0] || '/').replace(/\/+$/, '') || '/';
   const isRead = req.method === 'GET' || req.method === 'HEAD';
   if (!isRead) return false;
+
+  if (rawPath === '/robots.txt') {
+    const txt = renderRobotsTxt(PRODUCTION_ORIGIN);
+    res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'public, max-age=3600',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    if (req.method === 'HEAD') res.end();
+    else res.end(txt);
+    return true;
+  }
+
+  if (rawPath === '/sitemap.xml') {
+    const xml = renderSitemapXml(PRODUCTION_ORIGIN, SHIP_RELEASES[0]?.date || '2026-11-02');
+    res.writeHead(200, {
+      'Content-Type': 'application/xml; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    if (req.method === 'HEAD') res.end();
+    else res.end(xml);
+    return true;
+  }
+
+  if (rawPath === '/llms.txt') {
+    const txt = renderLlmsTxt({
+      origin: PRODUCTION_ORIGIN,
+      githubUrl: GITHUB_REPO_URL,
+      wifContract: WIF_TOKEN_CONTRACT_MAINNET,
+      releases: SHIP_RELEASES,
+      vaultInfo,
+    });
+    res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    if (req.method === 'HEAD') res.end();
+    else res.end(txt);
+    return true;
+  }
 
   if (rawPath === '/changelog' || rawPath === '/updates') {
     const html = renderChangelogHtml(vaultInfo, '/changelog');

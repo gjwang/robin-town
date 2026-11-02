@@ -530,6 +530,10 @@ export function mountRobinTown(): void {
     }
   }
 
+  function totalCombinedBurnedWif(): number {
+    return Math.round((onChainProof?.burnedDeadBalanceWif ?? 0) + flywheel.totalBurned);
+  }
+
   function refreshOnChainProof(): void {
     if (onChainProofLoading) return;
     onChainProofLoading = true;
@@ -537,6 +541,12 @@ export function mountRobinTown(): void {
       .then((proof) => {
         if (proof) {
           onChainProof = proof;
+          if (menuOpen) {
+            const burnPill = $('#start-screen .robin-chain-pill.burn');
+            if (burnPill) {
+              burnPill.textContent = `🔥 ${totalCombinedBurnedWif().toLocaleString('en-US')} $wif Burned`;
+            }
+          }
           if (get('#modal').open && get('#modal').dataset.wifHub === 'true') {
             openWifHub();
           }
@@ -1910,7 +1920,7 @@ export function mountRobinTown(): void {
         title: '5% Match Burn + 90% Purse',
         district: '$WIF FLYWHEEL',
         color: '#2ca56d',
-        owner: `${flywheel.totalBurned} $wif Burned`,
+        owner: `${totalCombinedBurnedWif().toLocaleString('en-US')} $wif Burned`,
         shop: '1.20x Staking Yield',
         income: 140,
       },
@@ -1982,7 +1992,7 @@ export function mountRobinTown(): void {
       <div class="start-panel">
         <div class="robin-kicker-badges">
           <span class="robin-chain-pill">● ROBINHOOD CHAIN · BUILD WITH $WIF</span>
-          <span class="robin-chain-pill burn">🔥 ${flywheel.totalBurned.toLocaleString('en-US')} $wif Burned</span>
+          <span class="robin-chain-pill burn">🔥 ${totalCombinedBurnedWif().toLocaleString('en-US')} $wif Burned</span>
           <button type="button" class="robin-chain-pill traders-live-pill" data-action="open-traders-board" aria-label="View connected wallets and Harbor Leaderboard">🦊 ${uniqueWalletsCount.toLocaleString('en-US')} ${uniqueWalletsCount === 1 ? 'Wallet' : 'Wallets'} · ${matchesPlayedCount.toLocaleString('en-US')} ${matchesPlayedCount === 1 ? 'Match' : 'Matches'} · Leaderboard ↗</button>
         </div>
 
@@ -2206,6 +2216,8 @@ export function mountRobinTown(): void {
           <a class="robin-chain-pill" href="${WORLD_IS_FLAT_BUILD_URL}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">🗳️ Vote with $wif (/build)</a>
           <a class="robin-chain-pill" href="${WORLD_IS_FLAT_FAIR_URL}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">⚖️ World is Fair (/fair)</a>
           <a class="robin-chain-pill" href="${WIF_PONS_LAUNCHPAD_URL}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">💱 Trade $wif on Pons</a>
+          <a class="robin-chain-pill" href="/changelog" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">📜 Changelog</a>
+          <a class="robin-chain-pill" href="/docs" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">📖 Game Docs</a>
         </div>
         ${
           eip6963Wallets.length > 0

@@ -104,6 +104,28 @@ describe('v1.5 Changelog Portal, RSS/Atom/JSON Syndication Feeds & Web Game Docs
       assert.equal(jf.ok, true);
       assert.equal(jf.items.length, SHIP_RELEASES.length);
       assert.equal(jf.releases.length, SHIP_RELEASES.length);
+
+      // 6. Crawler & LLM discovery endpoints (/robots.txt, /sitemap.xml, /llms.txt)
+      const robotsRes = await fetch(`${base}/robots.txt`);
+      assert.equal(robotsRes.status, 200);
+      const robotsTxt = await robotsRes.text();
+      assert.ok(robotsTxt.includes('Sitemap: https://robin-town-production.up.railway.app/sitemap.xml'));
+
+      const smRes = await fetch(`${base}/sitemap.xml`);
+      assert.equal(smRes.status, 200);
+      assert.match(smRes.headers.get('content-type') || '', /application\/xml/i);
+      const smXml = await smRes.text();
+      assert.ok(smXml.includes('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'));
+      assert.ok(smXml.includes('https://robin-town-production.up.railway.app/changelog'));
+      assert.ok(smXml.includes('https://robin-town-production.up.railway.app/docs'));
+
+      const llmsRes = await fetch(`${base}/llms.txt`);
+      assert.equal(llmsRes.status, 200);
+      const llmsTxt = await llmsRes.text();
+      assert.ok(llmsTxt.includes('# Robin Town'));
+      assert.ok(llmsTxt.includes('0x5173b8eA6923c2d40267890D45C46a3480954773'));
+      assert.ok(llmsTxt.includes('https://robin-town-production.up.railway.app/changelog'));
+      assert.ok(!llmsTxt.includes('—') && !llmsTxt.includes('–'));
     } finally {
       await new Promise<void>((resolve) => srv.close(() => resolve()));
       try {

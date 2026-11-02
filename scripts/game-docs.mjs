@@ -372,6 +372,71 @@ export function buildJsonFeedPayload({
   };
 }
 
+export function renderRobotsTxt(origin) {
+  return [
+    'User-agent: *',
+    'Allow: /',
+    `Sitemap: ${origin}/sitemap.xml`,
+    '',
+  ].join('\n');
+}
+
+export function renderSitemapXml(origin, lastmod = '2026-11-02') {
+  const routes = [
+    { path: '/', priority: '1.0' },
+    { path: '/changelog', priority: '0.9' },
+    { path: '/docs', priority: '0.9' },
+    { path: '/deploy', priority: '0.8' },
+    { path: '/changelog.xml', priority: '0.8' },
+    { path: '/atom.xml', priority: '0.8' },
+    { path: '/feed.json', priority: '0.8' },
+  ];
+  const urlsXml = routes
+    .map(
+      (r) => `  <url>
+    <loc>${escapeXml(`${origin}${r.path}`)}</loc>
+    <lastmod>${escapeXml(lastmod)}</lastmod>
+    <priority>${r.priority}</priority>
+  </url>`,
+    )
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urlsXml}
+</urlset>`;
+}
+
+export function renderLlmsTxt({ origin, githubUrl, wifContract, releases, vaultInfo = null }) {
+  const vaultLine = vaultInfo?.vaultContractAddress
+    ? `4. Official RobinTownHarborVault (RTOWN) Contract on Chain 4663: ${vaultInfo.vaultContractAddress} (https://robinhoodchain.blockscout.com/address/${vaultInfo.vaultContractAddress})`
+    : `4. RobinTownHarborVault (RTOWN) Contract Studio on Chain 4663: ${origin}/deploy`;
+  const releaseLines = releases
+    .map((rel, i) => `${i + 1}. ${rel.version} (${rel.date}): ${rel.title} (${rel.tagUrl})`)
+    .join('\n');
+
+  return `# Robin Town
+
+> Six-year 3D Harbor Diorama and 2D street negotiation board game built on Robinhood Chain Mainnet (Chain ID 4663) powered by the official World is Flat ($wif) token.
+
+## Primary Links & Feeds
+
+1. Live Web Game: ${origin}/
+2. GitHub Repository: ${githubUrl}
+3. Official World is Flat ($wif) Token on Chain 4663: ${wifContract} (https://robinhoodchain.blockscout.com/token/${wifContract})
+${vaultLine}
+5. Web Changelog: ${origin}/changelog
+6. RSS 2.0 Release Feed: ${origin}/changelog.xml
+7. Atom 1.0 Release Feed: ${origin}/atom.xml
+8. JSON Feed 1.1: ${origin}/feed.json
+9. Web Game & Smart Contract Documentation: ${origin}/docs
+
+## Shipped Releases
+
+${releaseLines}
+`;
+}
+
 export function renderDocsHtml({
   origin,
   githubUrl,

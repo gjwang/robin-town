@@ -74,6 +74,21 @@ contract RobinTownHarborVaultTest {
             "github mismatch"
         );
         require(
+            keccak256(bytes(vault.PROJECT_UPDATES())) ==
+                keccak256(bytes("https://robin-town-production.up.railway.app/changelog")),
+            "updates mismatch"
+        );
+        require(
+            keccak256(bytes(vault.PROJECT_DOCS())) ==
+                keccak256(bytes("https://robin-town-production.up.railway.app/docs")),
+            "docs mismatch"
+        );
+        require(
+            keccak256(bytes(vault.PROJECT_FEED_RSS())) ==
+                keccak256(bytes("https://robin-town-production.up.railway.app/changelog.xml")),
+            "rss feed mismatch"
+        );
+        require(
             vault.OFFICIAL_WIF_MAINNET() == 0x5173b8eA6923c2d40267890D45C46a3480954773,
             "wif constant mismatch"
         );
