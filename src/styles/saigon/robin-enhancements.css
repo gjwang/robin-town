@@ -3522,13 +3522,68 @@ dialog#modal.ledger-dialog {
   }
 }
 
+@media (min-width: 920px) {
+  .whats-new-grid.forecast-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .whats-new-card,
 .whats-new-forecast-card {
   margin-bottom: 0 !important;
+  padding: 12px 14px !important;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   min-width: 0;
+}
+
+.whats-new-card h3 {
+  margin: 2px 0 4px !important;
+  font-size: 16px !important;
+  color: #143d29;
+}
+
+.whats-new-summary {
+  margin: 2px 0 8px !important;
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  color: #24382e !important;
+}
+
+.whats-new-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.whats-new-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: rgba(20, 66, 44, 0.1);
+  border: 1px solid rgba(20, 66, 44, 0.24);
+  color: #12422b;
+  white-space: nowrap;
+}
+
+.whats-new-forecast-banner {
+  margin-bottom: 10px !important;
+  padding: 10px 14px !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.whats-new-forecast-banner h3 {
+  margin: 0 !important;
+  font-size: 15px !important;
 }
 
 .whats-new-card.featured {
