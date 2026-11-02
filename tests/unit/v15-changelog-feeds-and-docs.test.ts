@@ -150,5 +150,14 @@ describe('v1.5 Changelog Portal, RSS/Atom/JSON Syndication Feeds & Web Game Docs
       dockerfile.includes('scripts/game-docs.mjs'),
       'Dockerfile runner stage must copy scripts/game-docs.mjs',
     );
+
+    const uiSource = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/town/robin-town-ui.ts'),
+      'utf8',
+    );
+    assert.ok(uiSource.includes('function openWhatsNewModal'));
+    assert.ok(uiSource.includes('data-action="whats-new"'));
+    assert.ok(uiSource.includes('data-action="set-whats-new-tab"'));
+    assert.ok(uiSource.includes("searchParams.get('news') === '1'"));
   });
 });

@@ -34,6 +34,7 @@ export const SHIP_RELEASES = [
       'Added RFC 822 RSS 2.0 (/changelog.xml, /rss.xml, /feed.xml), RFC 4287 Atom 1.0 (/atom.xml), and JSON Feed 1.1 (/feed.json) feeds publishing every Robin Town ship.',
       'Published comprehensive web game and smart contract documentation at /docs covering the 6-year turn loop, storefront $wif yield matrix, Zodiac Market Events, and RobinTownHarborVault ABI selectors.',
       'Linked /changelog, /docs, and /changelog.xml directly inside the in-game Start Menu, How to Play modal, SSR home footer, and /deploy HEY Submission Studio.',
+      'Added the interactive in-game What\'s New & Live Harbor News Hub (/?news=1) with 3 tabs: v1.5.0 Release Highlights, Worldwide 6-Year Zodiac Market Forecast for Today\'s Daily Seed, and 1-Click Syndicated Feed URL Copy.',
     ],
   },
   {

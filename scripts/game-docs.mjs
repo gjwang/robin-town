@@ -229,6 +229,7 @@ export function renderPortalTopbarHtml(activePage, githubUrl) {
       <a class="portal-brand" href="/">ROBIN TOWN <span>CHAIN 4663 · $WIF</span></a>
       <nav class="portal-nav" aria-label="Robin Town navigation">
         <a class="nav-pill play" href="/">Play Game ▶</a>
+        <a class="nav-pill" href="/?news=1">✨ In-Game News</a>
         <a class="nav-pill ${isChangelog ? 'active' : ''}" href="/changelog">Changelog</a>
         <a class="nav-pill ${isDocs ? 'active' : ''}" href="/docs">Docs</a>
         <a class="nav-pill ${isDeploy ? 'active' : ''}" href="/deploy">Contract Studio</a>
