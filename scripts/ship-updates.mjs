@@ -379,7 +379,7 @@ export function renderDeployStudioHtml(vaultInfo = null) {
         padding: 10px 12px;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: 13px;
-        min-width: 300px;
+        min-width: min(300px, 100%);
         flex: 1;
       }
       .status-box {
@@ -460,6 +460,7 @@ export function renderDeployStudioHtml(vaultInfo = null) {
         <section class="panel">
           <h2>Step 3: Copy-Paste Kit for HEY Research Lab (heyresearch.xyz/submit)</h2>
           <p>Open <a href="https://heyresearch.xyz/submit" target="_blank" rel="noopener">heyresearch.xyz/submit</a>, fill the form first using the exact values below, then click <strong>Sign in to submit</strong> at the bottom with your GitHub account (<code>harrymove-ctrl</code>) so your form stays preserved in the tab with zero submission bond needed.</p>
+          <div class="table-wrap">
           <table class="hey-table">
             <tbody>
               <tr>
@@ -512,6 +513,7 @@ export function renderDeployStudioHtml(vaultInfo = null) {
               </tr>
             </tbody>
           </table>
+          </div>
         </section>
 
         <section class="panel">

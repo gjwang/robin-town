@@ -39,7 +39,8 @@ export function renderSharedPortalCss() {
         line-height: 1.58;
         padding: 24px 16px 72px;
       }
-      .portal-shell { max-width: 1080px; margin: 0 auto; }
+      .portal-shell { max-width: 1080px; margin: 0 auto; min-width: 0; }
+      main, .hero, .doc-section, .ship-card { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
       .portal-topbar {
         display: flex;
         flex-wrap: wrap;
@@ -126,7 +127,7 @@ export function renderSharedPortalCss() {
         align-items: start;
       }
       @media (max-width: 860px) {
-        .docs-grid { grid-template-columns: 1fr; }
+        .docs-grid { grid-template-columns: minmax(0, 1fr); }
         .docs-toc { position: static !important; }
       }
       .docs-toc {
@@ -200,6 +201,8 @@ export function renderSharedPortalCss() {
         border-radius: 5px;
         color: var(--mint);
         font-size: 12.5px;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
       .stat-cards {
         display: grid;
