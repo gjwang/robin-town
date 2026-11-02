@@ -311,5 +311,18 @@ describe('v1.3 Wave 4: Ship Updates Log, Dynamic OpenGraph Unfurling & Beat-My-S
     const xUrl = buildEmpireXShareUrl({ state: g, stakedBoost: true });
     const decoded = decodeURIComponent(xUrl);
     assert.ok(decoded.includes('daily=2026-11-02&target=840'));
+
+    const dockerfile = fs.readFileSync(path.resolve(process.cwd(), 'Dockerfile'), 'utf8');
+    for (const runtimeScript of [
+      'scripts/serve-prod.mjs',
+      'scripts/ws-relay.mjs',
+      'scripts/wallet-registry.mjs',
+      'scripts/ship-updates.mjs',
+    ]) {
+      assert.ok(
+        dockerfile.includes(runtimeScript),
+        `Dockerfile runner stage must copy ${runtimeScript}`,
+      );
+    }
   });
 });
