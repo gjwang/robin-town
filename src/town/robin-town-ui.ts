@@ -2050,7 +2050,9 @@ export function mountRobinTown(): void {
             <div class="start-foot-actions">
               ${progressActive ? `<button class="artbook-link" data-action="businesses">Shop ledger</button> · <button class="artbook-link" data-action="history">Town journal</button> · ` : ''}
               <button class="artbook-link" data-action="research">Design notebook & Aseprite artbook</button> ·
-              <a class="artbook-link" href="/updates" target="_blank" rel="noopener">Ship log</a> ·
+              <a class="artbook-link" href="/changelog" target="_blank" rel="noopener">Changelog</a> ·
+              <a class="artbook-link" href="/docs" target="_blank" rel="noopener">Docs</a> ·
+              <a class="artbook-link" href="/changelog.xml" target="_blank" rel="noopener">RSS</a> ·
               <a class="artbook-link" href="https://github.com/harrymove-ctrl/robin-town" target="_blank" rel="noopener">GitHub</a>
             </div>
           </div>
@@ -2842,6 +2844,7 @@ export function mountRobinTown(): void {
       <h3>Annual Storefront Yield Table</h3>
       <table><thead><tr><th>Connected Tiles</th><th>Growing Group</th><th>Complete Set</th></tr></thead><tbody>${[1, 2, 3, 4, 5, 6].map((n) => `<tr><td>${n}</td><td>${n === 6 ? 'n/a' : INCOMPLETE[n] + ' $wif'}</td><td>${n >= 3 ? COMPLETE[n] + ' $wif' : 'n/a'}</td></tr>`).join('')}</tbody></table>
       <p class="rules-note">Casual Mode requires zero $wif to enter and awards Town Points swappable for $wif (3% burn). Ranked Mode pools 4,000 $wif (90% podium, 5% burned to 0x…dEaD, 5% to Staking Vault).</p>
+      <p class="rules-note" style="margin-top:6px"><a href="/docs" target="_blank" rel="noopener">Full Web Game &amp; $wif Docs (/docs) ↗</a> · <a href="/changelog" target="_blank" rel="noopener">Changelog &amp; Release Feed (/changelog) ↗</a></p>
       <button class="primary wide" data-action="close">Back to Robin-Town</button>`,
       'HOW TO PLAY · ROBIN TOWN',
     );

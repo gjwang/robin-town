@@ -2,6 +2,8 @@
 
 **Live Playable App**: [https://robin-town-production.up.railway.app](https://robin-town-production.up.railway.app)
 **Repository**: [https://github.com/harrymove-ctrl/robin-town](https://github.com/harrymove-ctrl/robin-town)
+**Live Changelog & Syndicated Feeds**: [Changelog (`/changelog`)](https://robin-town-production.up.railway.app/changelog) · [RSS 2.0 (`/changelog.xml`)](https://robin-town-production.up.railway.app/changelog.xml) · [Atom 1.0 (`/atom.xml`)](https://robin-town-production.up.railway.app/atom.xml) · [JSON Feed (`/feed.json`)](https://robin-town-production.up.railway.app/feed.json)
+**Web Game & Smart Contract Docs**: [https://robin-town-production.up.railway.app/docs](https://robin-town-production.up.railway.app/docs) · [Contract Studio (`/deploy`)](https://robin-town-production.up.railway.app/deploy)
 **Hackathon Demo Video (`3:20`, 1080p)**: [robin-town-hackathon-master.mp4](https://github.com/harrymove-ctrl/robin-town/releases/download/v1.0.0/robin-town-hackathon-master.mp4)
 **X Launch Video (`0:44`, 1080p)**: [robin-town-x-launch.mp4](https://github.com/harrymove-ctrl/robin-town/releases/download/v1.0.0/robin-town-x-launch.mp4)
 **Raylight 3D Mobile & `$wif` Intro (`0:34`, 1080p)**: [robin-town-intro.mp4](https://github.com/harrymove-ctrl/robin-town/releases/download/v1.0.0/robin-town-intro.mp4)

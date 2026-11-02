@@ -4,6 +4,14 @@ import {
   VAULT_CREATION_TX_DATA_MAINNET,
   VAULT_SOLIDITY_SOURCE,
 } from './contract-artifact.mjs';
+import {
+  buildJsonFeedPayload,
+  renderAtomFeedXml,
+  renderDocsHtml,
+  renderPortalTopbarHtml,
+  renderRssFeedXml,
+  renderSharedPortalCss,
+} from './game-docs.mjs';
 
 export const PRODUCTION_ORIGIN = 'https://robin-town-production.up.railway.app';
 export const GITHUB_REPO_URL = 'https://github.com/harrymove-ctrl/robin-town';
@@ -11,8 +19,25 @@ export const WIF_TOKEN_CONTRACT_MAINNET = '0x5173b8eA6923c2d40267890D45C46a34809
 
 export const SHIP_RELEASES = [
   {
+    version: 'v1.5.0',
+    date: '2026-11-02',
+    publishedAt: '2026-11-02T05:00:00Z',
+    categories: ['Multiplayer & Infra', 'Web3 & $wif', 'Gameplay'],
+    title:
+      'Unified Changelog Portal, RSS 2.0 & Atom 1.0 Syndication Feeds, JSON Feed 1.1 & Web Game Documentation',
+    tagUrl: `${GITHUB_REPO_URL}/releases/tag/v1.5.0`,
+    highlights: [
+      'Launched /changelog with interactive category filtering, version permalinks, and auto-discovered syndication tags in index.html for automated release crawlers.',
+      'Added RFC 822 RSS 2.0 (/changelog.xml, /rss.xml, /feed.xml), RFC 4287 Atom 1.0 (/atom.xml), and JSON Feed 1.1 (/feed.json) feeds publishing every Robin Town ship.',
+      'Published comprehensive web game and smart contract documentation at /docs covering the 6-year turn loop, storefront $wif yield matrix, Zodiac Market Events, and RobinTownHarborVault ABI selectors.',
+      'Linked /changelog, /docs, and /changelog.xml directly inside the in-game Start Menu, How to Play modal, SSR home footer, and /deploy HEY Submission Studio.',
+    ],
+  },
+  {
     version: 'v1.4.0',
     date: '2026-11-02',
+    publishedAt: '2026-11-02T04:30:00Z',
+    categories: ['Smart Contract', 'Web3 & $wif'],
     title:
       'RobinTownHarborVault Game Contract, On-Chain Match Anchoring, Soulbound RTOWN Reputation & Deploy Studio',
     tagUrl: `${GITHUB_REPO_URL}/releases/tag/v1.4.0`,
@@ -26,10 +51,12 @@ export const SHIP_RELEASES = [
   {
     version: 'v1.3.0',
     date: '2026-11-02',
+    publishedAt: '2026-11-02T03:50:00Z',
+    categories: ['Gameplay', 'Web3 & $wif', 'Multiplayer & Infra'],
     title: 'Zodiac Harbor Events, AI Counter-Offers, EIP-6963 Wallets & Beat My Score Links',
     tagUrl: `${GITHUB_REPO_URL}/releases/tag/v1.3.0`,
     highlights: [
-      'Added 6 deterministic Zodiac Market Events (Harbor Cargo Boom, Lantern Night Festival, Morning Market Bloom, Merchant Guild Rebate, Artisan Ribbon Grant, Port Prosperity Wave) permuted cleanly per Daily Harbor Seed.',
+      'Added 6 deterministic Zodiac Market Events (Harbor Cargo Surge, Night Market Festival, Morning Bake & Bloom, Merchant Guild Fair, Master Artisan Grant, Port District Boom) permuted cleanly per Daily Harbor Seed.',
       'Added District Guild Majority Seals (+15 $wif/yr per 6+ plot majority across the 6 harbor districts) and full income Breakdown tracking in the Shopkeeper Ledger.',
       'Added intelligent 1-click AI Counter-Offers and Rival Monopoly Risk warnings inside the OTC Bargaining Table.',
       'Added EIP-6963 multi-wallet discovery, mobile MetaMask deep-link handoff, 1-click wallet_watchAsset ($wif), and RobinTownHarborVault ABI encoders on Robinhood Chain (4663).',
@@ -39,6 +66,8 @@ export const SHIP_RELEASES = [
   {
     version: 'v1.2.0',
     date: '2026-11-01',
+    publishedAt: '2026-11-01T18:00:00Z',
+    categories: ['Gameplay', 'Web3 & $wif', 'Multiplayer & Infra'],
     title: 'Full-Viewport Responsive Overhaul, Harbor Wallet Registry & Daily Seed Streaks',
     tagUrl: `${GITHUB_REPO_URL}/releases/tag/v1.2.0`,
     highlights: [
@@ -50,6 +79,8 @@ export const SHIP_RELEASES = [
   {
     version: 'v1.1.0',
     date: '2026-10-31',
+    publishedAt: '2026-10-31T16:00:00Z',
+    categories: ['Gameplay', 'Multiplayer & Infra'],
     title: 'Fast Play A-to-Z Simulation, Smart Draft Synergies & Interactive Coachmarks',
     tagUrl: `${GITHUB_REPO_URL}/releases/tag/v1.1.0`,
     highlights: [
@@ -61,6 +92,8 @@ export const SHIP_RELEASES = [
   {
     version: 'v1.0.0',
     date: '2026-10-30',
+    publishedAt: '2026-10-30T14:00:00Z',
+    categories: ['Gameplay', 'Web3 & $wif'],
     title: 'Robin Town Launch: 3D Harbor Diorama, 2D Street Board & Official $wif Flywheel',
     tagUrl: `${GITHUB_REPO_URL}/releases/tag/v1.0.0`,
     highlights: [
@@ -79,19 +112,20 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
-export function renderUpdatesHtml(vaultInfo = null) {
+export function renderChangelogHtml(vaultInfo = null, canonicalPath = '/changelog') {
   const vaultAddr = vaultInfo?.vaultContractAddress || null;
   const vaultBlockscoutUrl = vaultAddr
     ? `https://robinhoodchain.blockscout.com/address/${vaultAddr}`
     : null;
 
   const articlesHtml = SHIP_RELEASES.map(
-    (rel, idx) => `<article class="ship-card" id="${escapeHtml(rel.version)}">
+    (rel, idx) => `<article class="ship-card" id="${escapeHtml(rel.version)}" data-cats="${escapeHtml((rel.categories || []).join('|'))}">
       <header class="ship-card-head">
         <div class="ship-badges">
-          <span class="ship-version">${escapeHtml(rel.version)}</span>
+          <a class="ship-version" href="#${escapeHtml(rel.version)}">${escapeHtml(rel.version)}</a>
           <time datetime="${escapeHtml(rel.date)}">${escapeHtml(rel.date)}</time>
           ${idx === 0 ? '<span class="ship-latest">LATEST SHIP</span>' : ''}
+          ${(rel.categories || []).map((c) => `<span class="ship-cat">${escapeHtml(c)}</span>`).join('')}
         </div>
         <h2>${escapeHtml(rel.title)}</h2>
       </header>
@@ -100,6 +134,7 @@ export function renderUpdatesHtml(vaultInfo = null) {
       </ol>
       <footer class="ship-card-foot">
         <a href="${escapeHtml(rel.tagUrl)}" target="_blank" rel="noopener">GitHub Release ${escapeHtml(rel.version)} ↗</a>
+        <a href="/changelog#${escapeHtml(rel.version)}" class="permalink">Permalink #${escapeHtml(rel.version)}</a>
       </footer>
     </article>`,
   ).join('\n    ');
@@ -109,95 +144,71 @@ export function renderUpdatesHtml(vaultInfo = null) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Robin Town · Ship Log &amp; Product Releases on Robinhood Chain (4663)</title>
-    <meta name="description" content="Verified product releases and engineering ship log for Robin Town on Robinhood Chain Mainnet (4663) powered by World is Flat ($wif)." />
-    <link rel="canonical" href="${PRODUCTION_ORIGIN}/updates" />
+    <title>Robin Town Changelog &amp; Release Feed · Robinhood Chain (4663)</title>
+    <meta name="description" content="Dated product changelog, syndicated RSS/Atom release feeds, and verified engineering ships for Robin Town on Robinhood Chain Mainnet (4663) powered by World is Flat ($wif)." />
+    <link rel="canonical" href="${PRODUCTION_ORIGIN}${escapeHtml(canonicalPath)}" />
     <link rel="vcs-git" href="${GITHUB_REPO_URL}" />
+    <link rel="alternate" type="application/rss+xml" title="Robin Town Changelog (RSS 2.0)" href="${PRODUCTION_ORIGIN}/changelog.xml" />
+    <link rel="alternate" type="application/atom+xml" title="Robin Town Changelog (Atom 1.0)" href="${PRODUCTION_ORIGIN}/atom.xml" />
+    <link rel="alternate" type="application/feed+json" title="Robin Town Release Feed (JSON)" href="${PRODUCTION_ORIGIN}/feed.json" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Robin Town" />
-    <meta property="og:url" content="${PRODUCTION_ORIGIN}/updates" />
-    <meta property="og:title" content="Robin Town · Verified Ship Log &amp; Releases" />
-    <meta property="og:description" content="Follow every shipped release of Robin Town on Robinhood Chain (4663) with World is Flat ($wif)." />
+    <meta property="og:url" content="${PRODUCTION_ORIGIN}${escapeHtml(canonicalPath)}" />
+    <meta property="og:title" content="Robin Town · Changelog &amp; Verified Release Feed" />
+    <meta property="og:description" content="Follow every shipped release of Robin Town on Robinhood Chain (4663) via web changelog, RSS 2.0, Atom 1.0, or JSON Feed." />
     <meta property="og:image" content="${PRODUCTION_ORIGIN}/assets/saigon/saigon-town-og-v8.png?v=v13" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Robin Town · Verified Ship Log &amp; Releases" />
+    <meta name="twitter:title" content="Robin Town · Changelog &amp; Verified Release Feed" />
     <meta name="twitter:description" content="Follow every shipped release of Robin Town on Robinhood Chain (4663) with World is Flat ($wif)." />
     <meta name="twitter:image" content="${PRODUCTION_ORIGIN}/assets/saigon/saigon-town-og-v8.png?v=v13" />
     <style>
-      :root {
-        color-scheme: dark;
-        --bg: #0f291e;
-        --panel: #163b2b;
-        --border: rgba(238, 195, 83, 0.35);
-        --gold: #eec353;
-        --mint: #8bf5b5;
-        --text: #f6f2e6;
-        --muted: #b9d4c4;
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: radial-gradient(circle at top, #1b4a36 0%, var(--bg) 70%);
-        color: var(--text);
-        line-height: 1.55;
-        padding: 32px 16px 64px;
-      }
-      main { max-width: 880px; margin: 0 auto; }
-      .hero {
-        background: rgba(12, 33, 24, 0.86);
-        border: 2px solid var(--gold);
-        border-radius: 18px;
-        padding: 24px;
-        margin-bottom: 24px;
-      }
-      .kicker {
-        display: inline-block;
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: 0.06em;
-        color: var(--mint);
-        background: rgba(57, 168, 131, 0.18);
-        border: 1px solid rgba(139, 245, 181, 0.35);
-        border-radius: 999px;
-        padding: 4px 12px;
-        margin-bottom: 10px;
-      }
-      h1 { margin: 0 0 8px; font-size: clamp(26px, 4vw, 38px); line-height: 1.15; }
-      .hero p { margin: 0 0 14px; color: var(--muted); }
-      .links { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-      .btn {
-        display: inline-flex;
+      ${renderSharedPortalCss()}
+      .feed-copy-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
         align-items: center;
-        gap: 6px;
-        padding: 8px 14px;
-        border-radius: 10px;
+        margin-top: 12px;
+      }
+      .copy-chip {
+        cursor: pointer;
+        background: var(--card);
+        color: var(--mint);
+        border: 1px solid rgba(139, 245, 181, 0.32);
+        border-radius: 9px;
+        padding: 6px 11px;
+        font-size: 12.5px;
         font-weight: 700;
-        font-size: 14px;
-        text-decoration: none;
-        color: #14261c;
-        background: var(--gold);
       }
-      .btn.secondary {
-        background: rgba(255, 255, 255, 0.08);
-        color: var(--text);
-        border: 1px solid var(--border);
+      .copy-chip:hover { border-color: var(--gold); color: var(--gold); }
+      .filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
       }
-      .contract-meta {
-        margin-top: 14px;
-        padding-top: 12px;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        font-size: 13px;
+      .filter-btn {
+        cursor: pointer;
+        background: var(--panel);
         color: var(--muted);
-        word-break: break-all;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 6px 14px;
+        font-size: 13px;
+        font-weight: 700;
       }
-      .contract-meta code, .contract-meta a { color: var(--mint); }
+      .filter-btn.active {
+        background: var(--gold);
+        color: #13261b;
+        border-color: var(--gold);
+      }
       .ship-card {
         background: var(--panel);
         border: 1px solid var(--border);
         border-radius: 16px;
         padding: 20px 22px;
         margin-bottom: 16px;
+        scroll-margin-top: 82px;
       }
       .ship-badges {
         display: flex;
@@ -213,6 +224,7 @@ export function renderUpdatesHtml(vaultInfo = null) {
         background: var(--gold);
         padding: 2px 10px;
         border-radius: 999px;
+        text-decoration: none;
       }
       .ship-latest {
         font-weight: 800;
@@ -222,26 +234,38 @@ export function renderUpdatesHtml(vaultInfo = null) {
         padding: 2px 8px;
         border-radius: 999px;
       }
+      .ship-cat {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 2px 8px;
+        border-radius: 999px;
+      }
       time { color: var(--muted); font-weight: 600; }
-      h2 { margin: 0 0 12px; font-size: 20px; }
+      h2 { margin: 0 0 12px; font-size: 20px; color: var(--text); }
       .ship-list { margin: 0 0 14px; padding-left: 20px; color: var(--text); }
       .ship-list li { margin-bottom: 6px; }
-      .ship-card-foot a { color: var(--gold); font-weight: 700; text-decoration: none; font-size: 14px; }
+      .ship-card-foot { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+      .ship-card-foot a { color: var(--gold); font-weight: 700; text-decoration: none; font-size: 13.5px; }
+      .ship-card-foot a.permalink { color: var(--muted); font-weight: 600; }
       .ship-card-foot a:hover { text-decoration: underline; }
     </style>
   </head>
   <body>
-    <main>
+    <div class="portal-shell">
+      ${renderPortalTopbarHtml('changelog', GITHUB_REPO_URL)}
+
       <header class="hero">
-        <span class="kicker">ROBINHOOD CHAIN MAINNET (4663) · VERIFIED SHIP LOG</span>
-        <h1>Robin Town Product Updates &amp; Releases</h1>
-        <p>Six-year 3D Harbor Diorama and 2D street trading board game built on Robinhood Chain (4663) with official World is Flat ($wif) utility.</p>
-        <nav class="links" aria-label="Primary project links">
-          <a class="btn" href="/">Play Robin Town Live ▶</a>
-          <a class="btn secondary" href="${GITHUB_REPO_URL}" rel="noopener">GitHub Repository (harrymove-ctrl/robin-town) ↗</a>
-          <a class="btn secondary" href="/deploy">Contract &amp; HEY Studio (/deploy)</a>
-          <a class="btn secondary" href="/updates.json">JSON Feed (/updates.json)</a>
-        </nav>
+        <span class="kicker">ROBINHOOD CHAIN MAINNET (4663) · VERIFIED SHIP LOG &amp; SYNDICATED FEEDS</span>
+        <h1>Robin Town Changelog &amp; Release Feed</h1>
+        <p>Every dated release, smart contract upgrade, and gameplay ship for Robin Town (${SHIP_RELEASES.length} verified releases shipped). Subscribe or verify via HTML, RSS 2.0, Atom 1.0, or JSON Feed 1.1.</p>
+        <div class="feed-copy-bar">
+          <button type="button" class="copy-chip" data-copy-url="${PRODUCTION_ORIGIN}/changelog">📋 Copy Changelog URL (/changelog)</button>
+          <button type="button" class="copy-chip" data-copy-url="${PRODUCTION_ORIGIN}/changelog.xml">📡 Copy RSS 2.0 Feed (/changelog.xml)</button>
+          <button type="button" class="copy-chip" data-copy-url="${PRODUCTION_ORIGIN}/docs">📖 Copy Game Docs URL (/docs)</button>
+        </div>
         <div class="contract-meta">
           <div>Official World is Flat ($wif) Token on Robinhood Chain (4663): <a href="https://robinhoodchain.blockscout.com/token/${WIF_TOKEN_CONTRACT_MAINNET}" target="_blank" rel="noopener"><code>${WIF_TOKEN_CONTRACT_MAINNET}</code></a></div>
           ${
@@ -251,11 +275,53 @@ export function renderUpdatesHtml(vaultInfo = null) {
           }
         </div>
       </header>
-      ${articlesHtml}
-    </main>
+
+      <div class="filter-bar" role="toolbar" aria-label="Filter releases by category">
+        <button type="button" class="filter-btn active" data-filter="all">All Ships (${SHIP_RELEASES.length})</button>
+        <button type="button" class="filter-btn" data-filter="Smart Contract">Smart Contract</button>
+        <button type="button" class="filter-btn" data-filter="Gameplay">Gameplay</button>
+        <button type="button" class="filter-btn" data-filter="Web3 &amp; $wif">Web3 &amp; $wif</button>
+        <button type="button" class="filter-btn" data-filter="Multiplayer &amp; Infra">Multiplayer &amp; Infra</button>
+      </div>
+
+      <main>
+        ${articlesHtml}
+      </main>
+    </div>
+    <script>
+      (function () {
+        document.querySelectorAll('[data-copy-url]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const url = btn.getAttribute('data-copy-url') || '';
+            navigator.clipboard.writeText(url);
+            const prev = btn.textContent;
+            btn.textContent = 'Copied ✓';
+            setTimeout(() => { btn.textContent = prev; }, 1400);
+          });
+        });
+        const cards = Array.from(document.querySelectorAll('.ship-card'));
+        document.querySelectorAll('[data-filter]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            document.querySelectorAll('[data-filter]').forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            const cat = btn.getAttribute('data-filter') || 'all';
+            cards.forEach((card) => {
+              const raw = card.getAttribute('data-cats') || '';
+              card.hidden = cat !== 'all' && !raw.split('|').includes(cat);
+            });
+          });
+        });
+      })();
+    </script>
   </body>
 </html>`;
 }
+
+export function renderUpdatesHtml(vaultInfo = null) {
+  return renderChangelogHtml(vaultInfo, '/changelog');
+}
+
+export { renderDocsHtml, renderRssFeedXml, renderAtomFeedXml, buildJsonFeedPayload };
 
 export function renderDeployStudioHtml(vaultInfo = null) {
   const activeVault = vaultInfo?.vaultContractAddress || '';
@@ -270,28 +336,11 @@ export function renderDeployStudioHtml(vaultInfo = null) {
     <title>Robin Town · Smart Contract Deployer &amp; HEY Submission Studio (Chain 4663)</title>
     <link rel="canonical" href="${PRODUCTION_ORIGIN}/deploy" />
     <link rel="vcs-git" href="${GITHUB_REPO_URL}" />
+    <link rel="alternate" type="application/rss+xml" title="Robin Town Changelog (RSS 2.0)" href="${PRODUCTION_ORIGIN}/changelog.xml" />
+    <link rel="alternate" type="application/atom+xml" title="Robin Town Changelog (Atom 1.0)" href="${PRODUCTION_ORIGIN}/atom.xml" />
     <style>
-      :root {
-        color-scheme: dark;
-        --bg: #0d241a;
-        --panel: #153829;
-        --card: #0f2b1f;
-        --border: rgba(238, 195, 83, 0.35);
-        --gold: #eec353;
-        --mint: #8bf5b5;
-        --text: #f6f2e6;
-        --muted: #b9d4c4;
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: radial-gradient(circle at top, #1b4a36 0%, var(--bg) 72%);
-        color: var(--text);
-        line-height: 1.5;
-        padding: 28px 16px 64px;
-      }
-      main { max-width: 960px; margin: 0 auto; }
+      ${renderSharedPortalCss()}
+      main { max-width: 980px; margin: 0 auto; }
       .panel {
         background: var(--panel);
         border: 1.5px solid var(--border);
@@ -299,20 +348,6 @@ export function renderDeployStudioHtml(vaultInfo = null) {
         padding: 22px;
         margin-bottom: 20px;
       }
-      .hero { border: 2px solid var(--gold); background: rgba(11, 31, 22, 0.9); }
-      .kicker {
-        display: inline-block;
-        font-size: 11.5px;
-        font-weight: 800;
-        letter-spacing: 0.06em;
-        color: var(--mint);
-        background: rgba(57, 168, 131, 0.18);
-        border: 1px solid rgba(139, 245, 181, 0.35);
-        border-radius: 999px;
-        padding: 4px 12px;
-        margin-bottom: 8px;
-      }
-      h1 { margin: 0 0 8px; font-size: clamp(24px, 3.6vw, 34px); }
       h2 { margin: 0 0 10px; font-size: 19px; color: var(--gold); }
       p { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
       .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
@@ -363,7 +398,7 @@ export function renderDeployStudioHtml(vaultInfo = null) {
         border-bottom: 1px solid rgba(255, 255, 255, 0.09);
         vertical-align: middle;
       }
-      .hey-table th { color: var(--mint); width: 220px; font-weight: 700; }
+      .hey-table th { color: var(--mint); width: 220px; font-weight: 700; background: transparent; }
       .hey-table code {
         display: inline-block;
         background: var(--card);
@@ -386,103 +421,110 @@ export function renderDeployStudioHtml(vaultInfo = null) {
     </style>
   </head>
   <body>
-    <main>
-      <section class="panel hero">
-        <span class="kicker">ROBINHOOD CHAIN MAINNET (4663) · ZERO PRIVATE KEY EXPOSURE</span>
-        <h1>RobinTownHarborVault Deploy &amp; HEY Submission Studio</h1>
-        <p>Deploy the official <strong>RobinTownHarborVault</strong> game smart contract (<code>${escapeHtml(VAULT_CONTRACT_METADATA.compilerVersion)}</code>, EVM <code>${escapeHtml(VAULT_CONTRACT_METADATA.evmVersion)}</code>, optimizer <code>${VAULT_CONTRACT_METADATA.optimizerRuns}</code> runs) directly through your browser MetaMask or Rabby wallet on Robinhood Chain (4663), activate it live across Robin Town, and copy every verified field into <a href="https://heyresearch.xyz/submit" target="_blank" rel="noopener">heyresearch.xyz/submit</a>.</p>
-        <div class="row">
-          <a class="btn secondary" href="/">← Back to Robin Town Game</a>
-          <a class="btn secondary" href="/updates">View /updates Ship Feed</a>
-          <a class="btn secondary" href="https://heyresearch.xyz/submit" target="_blank" rel="noopener">Open HEY Submit Form ↗</a>
-        </div>
-        <div id="live-vault-banner" class="status-box">
-          ${
-            activeVault
-              ? `✅ Active Registered Game Contract on Robin Town: <a href="https://robinhoodchain.blockscout.com/address/${escapeHtml(activeVault)}" target="_blank" rel="noopener"><code>${escapeHtml(activeVault)}</code> ↗</a>`
-              : '⏳ Status: Contract compiled & ready to deploy on Robinhood Chain Mainnet (4663). Estimated deploy gas: ~1.32M gas.'
-          }
-        </div>
-      </section>
+    <div class="portal-shell">
+      ${renderPortalTopbarHtml('deploy', GITHUB_REPO_URL)}
+      <main>
+        <section class="panel hero">
+          <span class="kicker">ROBINHOOD CHAIN MAINNET (4663) · ZERO PRIVATE KEY EXPOSURE</span>
+          <h1>RobinTownHarborVault Deploy &amp; HEY Submission Studio</h1>
+          <p>Deploy the official <strong>RobinTownHarborVault</strong> game smart contract (<code>${escapeHtml(VAULT_CONTRACT_METADATA.compilerVersion)}</code>, EVM <code>${escapeHtml(VAULT_CONTRACT_METADATA.evmVersion)}</code>, optimizer <code>${VAULT_CONTRACT_METADATA.optimizerRuns}</code> runs) directly through your browser MetaMask or Rabby wallet on Robinhood Chain (4663), activate it live across Robin Town, and copy every verified field into <a href="https://heyresearch.xyz/submit" target="_blank" rel="noopener">heyresearch.xyz/submit</a>.</p>
+          <div class="row">
+            <a class="btn secondary" href="/">← Back to Robin Town Game</a>
+            <a class="btn secondary" href="/changelog">View /changelog</a>
+            <a class="btn secondary" href="/docs">View /docs</a>
+            <a class="btn secondary" href="https://heyresearch.xyz/submit" target="_blank" rel="noopener">Open HEY Submit Form ↗</a>
+          </div>
+          <div id="live-vault-banner" class="status-box">
+            ${
+              activeVault
+                ? `✅ Active Registered Game Contract on Robin Town: <a href="https://robinhoodchain.blockscout.com/address/${escapeHtml(activeVault)}" target="_blank" rel="noopener"><code>${escapeHtml(activeVault)}</code> ↗</a>`
+                : '⏳ Status: Contract compiled & ready to deploy on Robinhood Chain Mainnet (4663). Estimated deploy gas: ~1.32M gas.'
+            }
+          </div>
+        </section>
 
-      <section class="panel">
-        <h2>Step 1 &amp; 2: Connect Wallet &amp; Deploy RobinTownHarborVault on Chain 4663</h2>
-        <p>Constructor binds official World is Flat (<code>$wif</code> <code>${WIF_TOKEN_CONTRACT_MAINNET}</code>) and sets your connected wallet as contract <code>owner</code>. Includes instant-withdrawal <code>$wif</code> staking, 50/50 deflationary <code>$wif</code> district burns, gas-only Year 6 match anchoring (<code>recordHarborMatch</code>), and soulbound <code>RTOWN</code> Harbor Reputation.</p>
-        <div class="row">
-          <button type="button" id="btn-connect">1. Connect MetaMask / Rabby (Chain 4663)</button>
-          <button type="button" id="btn-deploy" disabled>2. Deploy RobinTownHarborVault Now</button>
-        </div>
-        <div class="row" style="margin-top:12px">
-          <input type="text" id="input-vault-addr" placeholder="Deployed 0x... RobinTownHarborVault address (auto-fills on deploy)" value="${escapeHtml(activeVault)}" />
-          <button type="button" class="secondary" id="btn-activate">3. Sign &amp; Activate Live on Robin Town</button>
-        </div>
-        <div id="deploy-log" class="status-box">Connect your Robinhood Chain (4663) wallet above to begin.</div>
-      </section>
+        <section class="panel">
+          <h2>Step 1 &amp; 2: Connect Wallet &amp; Deploy RobinTownHarborVault on Chain 4663</h2>
+          <p>Constructor binds official World is Flat (<code>$wif</code> <code>${WIF_TOKEN_CONTRACT_MAINNET}</code>) and sets your connected wallet as contract <code>owner</code>. Includes instant-withdrawal <code>$wif</code> staking, 50/50 deflationary <code>$wif</code> district burns, gas-only Year 6 match anchoring (<code>recordHarborMatch</code>), and soulbound <code>RTOWN</code> Harbor Reputation.</p>
+          <div class="row">
+            <button type="button" id="btn-connect">1. Connect MetaMask / Rabby (Chain 4663)</button>
+            <button type="button" id="btn-deploy" disabled>2. Deploy RobinTownHarborVault Now</button>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <input type="text" id="input-vault-addr" placeholder="Deployed 0x... RobinTownHarborVault address (auto-fills on deploy)" value="${escapeHtml(activeVault)}" />
+            <button type="button" class="secondary" id="btn-activate">3. Sign &amp; Activate Live on Robin Town</button>
+          </div>
+          <div id="deploy-log" class="status-box">Connect your Robinhood Chain (4663) wallet above to begin.</div>
+        </section>
 
-      <section class="panel">
-        <h2>Step 3: Copy-Paste Kit for HEY Research Lab (heyresearch.xyz/submit)</h2>
-        <p>Open <a href="https://heyresearch.xyz/submit" target="_blank" rel="noopener">heyresearch.xyz/submit</a>, fill the form first using the exact values below, then click <strong>Sign in to submit</strong> at the bottom with your GitHub account (<code>harrymove-ctrl</code>) so your form stays preserved in the tab with zero submission bond needed.</p>
-        <table class="hey-table">
-          <tbody>
-            <tr>
-              <th>Project name</th>
-              <td><code id="hey-name">Robin Town</code></td>
-              <td><button type="button" class="secondary" data-copy="hey-name">Copy</button></td>
-            </tr>
-            <tr>
-              <th>Project type</th>
-              <td><code>Application</code> (select from dropdown)</td>
-              <td></td>
-            </tr>
-            <tr>
-              <th>Narrative</th>
-              <td><code>Gaming</code> (select from dropdown)</td>
-              <td></td>
-            </tr>
-            <tr>
-              <th>One line about the project</th>
-              <td><code id="hey-desc">${escapeHtml(shortDesc)}</code></td>
-              <td><button type="button" class="secondary" data-copy="hey-desc">Copy</button></td>
-            </tr>
-            <tr>
-              <th>Website</th>
-              <td><code id="hey-site">${PRODUCTION_ORIGIN}</code></td>
-              <td><button type="button" class="secondary" data-copy="hey-site">Copy</button></td>
-            </tr>
-            <tr>
-              <th>Contract address (Chain 4663)</th>
-              <td><code id="hey-contract">${escapeHtml(activeVault || 'Deploy in Step 2 above to auto-fill 0x...')}</code></td>
-              <td><button type="button" class="secondary" data-copy="hey-contract">Copy</button></td>
-            </tr>
-            <tr>
-              <th>Ticker</th>
-              <td><code id="hey-ticker">RTOWN</code></td>
-              <td><button type="button" class="secondary" data-copy="hey-ticker">Copy</button></td>
-            </tr>
-            <tr>
-              <th>GitHub repository</th>
-              <td><code id="hey-github">${GITHUB_REPO_URL}</code></td>
-              <td><button type="button" class="secondary" data-copy="hey-github">Copy</button></td>
-            </tr>
-            <tr>
-              <th>Changelog, release feed or docs</th>
-              <td><code id="hey-updates">${PRODUCTION_ORIGIN}/updates</code></td>
-              <td><button type="button" class="secondary" data-copy="hey-updates">Copy</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+        <section class="panel">
+          <h2>Step 3: Copy-Paste Kit for HEY Research Lab (heyresearch.xyz/submit)</h2>
+          <p>Open <a href="https://heyresearch.xyz/submit" target="_blank" rel="noopener">heyresearch.xyz/submit</a>, fill the form first using the exact values below, then click <strong>Sign in to submit</strong> at the bottom with your GitHub account (<code>harrymove-ctrl</code>) so your form stays preserved in the tab with zero submission bond needed.</p>
+          <table class="hey-table">
+            <tbody>
+              <tr>
+                <th>Project name</th>
+                <td><code id="hey-name">Robin Town</code></td>
+                <td><button type="button" class="secondary" data-copy="hey-name">Copy</button></td>
+              </tr>
+              <tr>
+                <th>Project type</th>
+                <td><code>Application</code> (select from dropdown)</td>
+                <td></td>
+              </tr>
+              <tr>
+                <th>Narrative</th>
+                <td><code>Gaming</code> (select from dropdown)</td>
+                <td></td>
+              </tr>
+              <tr>
+                <th>One line about the project</th>
+                <td><code id="hey-desc">${escapeHtml(shortDesc)}</code></td>
+                <td><button type="button" class="secondary" data-copy="hey-desc">Copy</button></td>
+              </tr>
+              <tr>
+                <th>Website</th>
+                <td><code id="hey-site">${PRODUCTION_ORIGIN}</code></td>
+                <td><button type="button" class="secondary" data-copy="hey-site">Copy</button></td>
+              </tr>
+              <tr>
+                <th>Contract address (Chain 4663)</th>
+                <td><code id="hey-contract">${escapeHtml(activeVault || 'Deploy in Step 2 above to auto-fill 0x...')}</code></td>
+                <td><button type="button" class="secondary" data-copy="hey-contract">Copy</button></td>
+              </tr>
+              <tr>
+                <th>Ticker</th>
+                <td><code id="hey-ticker">RTOWN</code></td>
+                <td><button type="button" class="secondary" data-copy="hey-ticker">Copy</button></td>
+              </tr>
+              <tr>
+                <th>GitHub repository</th>
+                <td><code id="hey-github">${GITHUB_REPO_URL}</code></td>
+                <td><button type="button" class="secondary" data-copy="hey-github">Copy</button></td>
+              </tr>
+              <tr>
+                <th>Changelog, release feed or docs</th>
+                <td>
+                  <code id="hey-updates">${PRODUCTION_ORIGIN}/changelog</code>
+                  <div style="margin-top:6px;font-size:12px;color:var(--muted)">Also active: <a href="/changelog.xml">/changelog.xml (RSS 2.0)</a> · <a href="/atom.xml">/atom.xml (Atom)</a> · <a href="/docs">/docs</a></div>
+                </td>
+                <td><button type="button" class="secondary" data-copy="hey-updates">Copy</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
 
-      <section class="panel">
-        <h2>Step 4: Blockscout Source Code Verification (Optional Green Checkmark)</h2>
-        <p>On Blockscout (<code>robinhoodchain.blockscout.com/address/&lt;0x...&gt;?tab=contract</code>), click <strong>Verify &amp; publish</strong> → <strong>Solidity (Single file)</strong>, Compiler <code>${escapeHtml(VAULT_CONTRACT_METADATA.compilerVersion)}</code>, EVM <code>${escapeHtml(VAULT_CONTRACT_METADATA.evmVersion)}</code>, Optimization <code>Yes (${VAULT_CONTRACT_METADATA.optimizerRuns} runs)</code>, and paste the Solidity source below:</p>
-        <div class="row" style="margin-bottom:10px">
-          <button type="button" class="secondary" id="btn-copy-sol">Copy Solidity Source Code</button>
-          <a class="btn secondary" id="link-blockscout-verify" href="${activeVault ? `https://robinhoodchain.blockscout.com/address/${escapeHtml(activeVault)}?tab=contract` : 'https://robinhoodchain.blockscout.com'}" target="_blank" rel="noopener">Open Blockscout Contract Tab ↗</a>
-        </div>
-        <pre id="sol-source">${escapeHtml(VAULT_SOLIDITY_SOURCE)}</pre>
-      </section>
-    </main>
+        <section class="panel">
+          <h2>Step 4: Blockscout Source Code Verification (Optional Green Checkmark)</h2>
+          <p>On Blockscout (<code>robinhoodchain.blockscout.com/address/&lt;0x...&gt;?tab=contract</code>), click <strong>Verify &amp; publish</strong> → <strong>Solidity (Single file)</strong>, Compiler <code>${escapeHtml(VAULT_CONTRACT_METADATA.compilerVersion)}</code>, EVM <code>${escapeHtml(VAULT_CONTRACT_METADATA.evmVersion)}</code>, Optimization <code>Yes (${VAULT_CONTRACT_METADATA.optimizerRuns} runs)</code>, and paste the Solidity source below:</p>
+          <div class="row" style="margin-bottom:10px">
+            <button type="button" class="secondary" id="btn-copy-sol">Copy Solidity Source Code</button>
+            <a class="btn secondary" id="link-blockscout-verify" href="${activeVault ? `https://robinhoodchain.blockscout.com/address/${escapeHtml(activeVault)}?tab=contract` : 'https://robinhoodchain.blockscout.com'}" target="_blank" rel="noopener">Open Blockscout Contract Tab ↗</a>
+          </div>
+          <pre id="sol-source">${escapeHtml(VAULT_SOLIDITY_SOURCE)}</pre>
+        </section>
+      </main>
+    </div>
 
     <script>
       (function () {
@@ -596,8 +638,8 @@ export function renderDeployStudioHtml(vaultInfo = null) {
             if (!res.ok || !json.ok) throw new Error(json.error || 'Activation failed');
             heyContract.textContent = json.vaultContractAddress;
             verifyLink.href = json.explorerUrl + '?tab=contract';
-            banner.innerHTML = '✅ Active Registered Game Contract on Robin Town: <a href="' + json.explorerUrl + '" target="_blank"><code>' + json.vaultContractAddress + '</code> ↗</a> (linked live on /, /updates &amp; $wif Hub!)';
-            setLog('🎉 Activated! Robin Town home page (/), /updates, and in-game $wif Hub now link directly to <code>' + json.vaultContractAddress + '</code>.');
+            banner.innerHTML = '✅ Active Registered Game Contract on Robin Town: <a href="' + json.explorerUrl + '" target="_blank"><code>' + json.vaultContractAddress + '</code> ↗</a> (linked live on /, /changelog, /docs &amp; $wif Hub!)';
+            setLog('🎉 Activated! Robin Town home page (/), /changelog, /docs, and in-game $wif Hub now link directly to <code>' + json.vaultContractAddress + '</code>.');
           } catch (e) {
             setLog('⚠️ ' + (e.message || String(e)));
           }
@@ -714,38 +756,114 @@ export function renderDynamicIndexHtml(
 }
 
 export function handleShipUpdatesRequest(req, res, vaultInfo = null) {
-  const rawPath = (req.url || '/').split('?')[0] || '/';
-  if (rawPath === '/updates' && (req.method === 'GET' || req.method === 'HEAD')) {
-    const html = renderUpdatesHtml(vaultInfo);
+  const rawPath = ((req.url || '/').split('?')[0] || '/').replace(/\/+$/, '') || '/';
+  const isRead = req.method === 'GET' || req.method === 'HEAD';
+  if (!isRead) return false;
+
+  if (rawPath === '/changelog' || rawPath === '/updates') {
+    const html = renderChangelogHtml(vaultInfo, '/changelog');
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-cache',
       'X-Content-Type-Options': 'nosniff',
     });
-    if (req.method === 'HEAD') {
-      res.end();
-      return true;
-    }
-    res.end(html);
+    if (req.method === 'HEAD') res.end();
+    else res.end(html);
     return true;
   }
 
-  if (rawPath === '/deploy' && (req.method === 'GET' || req.method === 'HEAD')) {
+  if (rawPath === '/docs') {
+    const html = renderDocsHtml({
+      origin: PRODUCTION_ORIGIN,
+      githubUrl: GITHUB_REPO_URL,
+      wifContract: WIF_TOKEN_CONTRACT_MAINNET,
+      vaultMetadata: VAULT_CONTRACT_METADATA,
+      vaultInfo,
+    });
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    if (req.method === 'HEAD') res.end();
+    else res.end(html);
+    return true;
+  }
+
+  if (rawPath === '/changelog.xml' || rawPath === '/rss.xml' || rawPath === '/feed.xml') {
+    const xml = renderRssFeedXml({
+      origin: PRODUCTION_ORIGIN,
+      githubUrl: GITHUB_REPO_URL,
+      wifContract: WIF_TOKEN_CONTRACT_MAINNET,
+      releases: SHIP_RELEASES,
+      vaultInfo,
+    });
+    res.writeHead(200, {
+      'Content-Type': 'application/rss+xml; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    if (req.method === 'HEAD') res.end();
+    else res.end(xml);
+    return true;
+  }
+
+  if (rawPath === '/atom.xml') {
+    const xml = renderAtomFeedXml({
+      origin: PRODUCTION_ORIGIN,
+      githubUrl: GITHUB_REPO_URL,
+      wifContract: WIF_TOKEN_CONTRACT_MAINNET,
+      releases: SHIP_RELEASES,
+    });
+    res.writeHead(200, {
+      'Content-Type': 'application/atom+xml; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    if (req.method === 'HEAD') res.end();
+    else res.end(xml);
+    return true;
+  }
+
+  if (rawPath === '/feed.json' || rawPath === '/updates.json') {
+    const body = JSON.stringify(
+      buildJsonFeedPayload({
+        origin: PRODUCTION_ORIGIN,
+        githubUrl: GITHUB_REPO_URL,
+        wifContract: WIF_TOKEN_CONTRACT_MAINNET,
+        releases: SHIP_RELEASES,
+        vaultInfo,
+      }),
+    );
+    res.writeHead(200, {
+      'Content-Type':
+        rawPath === '/feed.json'
+          ? 'application/feed+json; charset=utf-8'
+          : 'application/json; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    if (req.method === 'HEAD') res.end();
+    else res.end(body);
+    return true;
+  }
+
+  if (rawPath === '/deploy') {
     const html = renderDeployStudioHtml(vaultInfo);
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
     });
-    if (req.method === 'HEAD') {
-      res.end();
-      return true;
-    }
-    res.end(html);
+    if (req.method === 'HEAD') res.end();
+    else res.end(html);
     return true;
   }
 
-  if (rawPath === '/api/contract/artifact' && (req.method === 'GET' || req.method === 'HEAD')) {
+  if (rawPath === '/api/contract/artifact') {
     const body = JSON.stringify({
       ok: true,
       metadata: VAULT_CONTRACT_METADATA,
@@ -758,37 +876,8 @@ export function handleShipUpdatesRequest(req, res, vaultInfo = null) {
       'Cache-Control': 'public, max-age=300',
       'Access-Control-Allow-Origin': '*',
     });
-    if (req.method === 'HEAD') {
-      res.end();
-      return true;
-    }
-    res.end(body);
-    return true;
-  }
-
-  if (rawPath === '/updates.json' && (req.method === 'GET' || req.method === 'HEAD')) {
-    const body = JSON.stringify({
-      ok: true,
-      project: 'Robin Town',
-      chainId: 4663,
-      wifTokenContract: WIF_TOKEN_CONTRACT_MAINNET,
-      vaultContractAddress: vaultInfo?.vaultContractAddress || null,
-      vaultExplorerUrl: vaultInfo?.explorerUrl || null,
-      websiteUrl: PRODUCTION_ORIGIN,
-      githubUrl: GITHUB_REPO_URL,
-      updatesUrl: `${PRODUCTION_ORIGIN}/updates`,
-      releases: SHIP_RELEASES,
-    });
-    res.writeHead(200, {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'no-cache',
-      'Access-Control-Allow-Origin': '*',
-    });
-    if (req.method === 'HEAD') {
-      res.end();
-      return true;
-    }
-    res.end(body);
+    if (req.method === 'HEAD') res.end();
+    else res.end(body);
     return true;
   }
 
